@@ -1,3 +1,8 @@
+// Polyfill for File to prevent undici crashes on Node 18 pkg binaries
+if (typeof global.File === 'undefined') {
+    global.File = class File {};
+}
+
 const express = require('express');
 const path = require('path');
 const jwt = require('jsonwebtoken');

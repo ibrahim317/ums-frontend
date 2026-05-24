@@ -1,8 +1,11 @@
 const Database = require('better-sqlite3');
 const path = require('path');
 
-// Initialize database
-const dbPath = path.join(__dirname, '../../auth.db');
+// Detect if running inside a packaged binary (pkg)
+const isPkg = typeof process.pkg !== 'undefined';
+const dbDir = isPkg ? path.dirname(process.execPath) : path.join(__dirname, '../../');
+const dbPath = path.join(dbDir, 'auth.db');
+
 const db = new Database(dbPath);
 
 // Initialization script to ensure tables exist and schema is correct
