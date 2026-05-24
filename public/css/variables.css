@@ -1,0 +1,14 @@
+:root {
+    --bg-color: #FFFFFF; /* Pure white background */
+    --panel-bg: #FFFFFF; /* Pure white panels */
+    --sidebar-bg: #F9FAFB; /* Very light grey sidebar */
+    --card-bg: #FFFFFF; /* Pure white cards */
+    --text-primary: #111827; /* Near black text */
+    --text-secondary: #6B7280; /* Medium grey text */
+    --accent-color: #0051C3; /* Cloudflare vibrant blue */
+    --accent-hover: #003D99;
+    --border-color: #E5E7EB; /* Light border */
+    --border-soft: #F3F4F6;
+    --banner-bg: #EFF6FF; /* Light blue for banners */
+    --banner-text: #1D4ED8; /* Dark blue for banners */
+}

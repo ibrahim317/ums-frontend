@@ -1,0 +1,321 @@
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.form-group input {
+    width: 100%;
+    background: #FFFFFF;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: 'Cairo', sans-serif;
+    font-size: 0.9rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 81, 195, 0.2);
+}
+
+.login-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #B91C1C;
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.btn-loader {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+/* Ghost Logout Button */
+.logout-ghost-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-family: 'Cairo', sans-serif;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.logout-ghost-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #DC2626; /* Darker red hover */
+}
+
+/* Buttons */
+.primary-btn {
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-family: 'Cairo', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    width: 100%;
+    background: var(--accent-color);
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.primary-btn:hover {
+    background: var(--accent-hover);
+}
+
+.primary-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.sm-btn {
+    width: auto;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+}
+
+.secondary-btn {
+    background: #FFFFFF;
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+    font-family: 'Cairo', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.secondary-btn:hover {
+    background: var(--sidebar-bg);
+    border-color: #D1D5DB;
+}
+
+.icon-btn {
+    padding: 6px;
+}
+
+/* SIDEBAR LINKS */
+.sidebar-link {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-family: 'Cairo', sans-serif;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 4px;
+    transition: all 0.2s;
+    text-align: right;
+    width: 100%;
+}
+
+.sidebar-link svg {
+    color: var(--text-secondary);
+}
+
+.sidebar-link:hover {
+    background: #F3F4F6;
+}
+
+.sidebar-link.active {
+    background: #F3F4F6;
+    font-weight: 700;
+}
+
+/* FILTER CONTROLS */
+.filter-controls {
+    display: flex;
+    margin-bottom: 24px;
+}
+
+.year-select-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.year-select-group label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.select-wrapper {
+    position: relative;
+    min-width: 200px;
+}
+
+.calendar-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+.chevron-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+select {
+    width: 100%;
+    padding: 6px 12px 6px 32px; /* left chevron */
+    padding-right: 32px; /* right calendar */
+    background: #FFFFFF;
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-family: 'Cairo', sans-serif;
+    font-size: 0.85rem;
+    appearance: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(0, 81, 195, 0.2);
+}
+
+select:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #F9FAFB;
+}
+
+/* Loader */
+.loader-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 50px 0;
+}
+
+.spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border-color);
+    border-top-color: var(--accent-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 12px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Error */
+.error-container {
+    text-align: center;
+    background: #FEF2F2;
+    border: 1px solid #FCA5A5;
+    padding: 24px;
+    border-radius: 6px;
+    margin: auto;
+    max-width: 500px;
+}
+
+.error-container p {
+    color: #B91C1C;
+    margin-bottom: 16px;
+    font-size: 0.95rem;
+}
+
+/* Cache Banner */
+.cache-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--banner-bg);
+    padding: 10px 16px;
+    border-radius: 6px;
+    margin-bottom: 24px;
+    font-size: 0.85rem;
+    color: var(--banner-text);
+}
+
+.cache-time {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 600;
+}
+
+.cache-time span {
+    font-weight: 400;
+}
+
+.revalidate-btn {
+    background: transparent;
+    border: none;
+    color: var(--banner-text);
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: 'Cairo', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: background 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.revalidate-btn:hover {
+    background: rgba(29, 78, 216, 0.1);
+}
+
+.revalidate-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
