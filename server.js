@@ -187,6 +187,16 @@ app.get('/api/grades/gpa', authenticateToken, async (req, res) => {
     }
 });
 
+// --- VERSION ENDPOINT ---
+app.get('/api/version', (req, res) => {
+    try {
+        const pkg = require('./package.json');
+        res.json({ success: true, version: pkg.version });
+    } catch (e) {
+        res.json({ success: true, version: '1.0.0' });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });

@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/grades.css">
+    <link rel="stylesheet" href="css/search.css">
 </head>
 
 <body>
@@ -22,6 +23,32 @@
                 <div class="nav-logo">
                     UMS Dashboard
                 </div>
+            </div>
+            <div class="nav-right">
+                <button id="search-nav-btn" class="nav-revalidate-btn" title="بحث">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                </button>
+                <div id="nav-cache-info" class="nav-cache-info hidden">
+                    <span id="nav-cache-time" class="nav-cache-time"></span>
+                    <button id="nav-revalidate-btn" class="nav-revalidate-btn" title="تحديث البيانات">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <polyline points="1 20 1 14 7 14"></polyline>
+                            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                        </svg>
+                    </button>
+                </div>
+                <button id="logout-nav-btn" class="logout-icon-btn" title="تسجيل الخروج">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                </button>
             </div>
         </header>
 
@@ -35,7 +62,7 @@
 
                 <form id="login-form">
                     <div class="form-group">
-                        <label for="username">اسم المستخدم (الرقم القومي / الإيميل)</label>
+                        <label for="username">اسم المستخدم (الالتحاق / الرقم القومي / الإيميل)</label>
                         <input type="text" id="username" name="username" required placeholder="أدخل اسم المستخدم">
                     </div>
                     <div class="form-group">
@@ -48,6 +75,17 @@
                         <div class="btn-loader hidden"></div>
                     </button>
                 </form>
+
+                <div id="saved-accounts-section" class="saved-accounts-section hidden">
+                    <div class="saved-accounts-divider">
+                        <span>أو</span>
+                    </div>
+                    <div class="saved-accounts-header">
+                        <h3>الحسابات المحفوظة</h3>
+                        <p>اضغط للدخول بلمسة واحدة</p>
+                    </div>
+                    <div id="saved-accounts-list" class="saved-accounts-list"></div>
+                </div>
             </div>
         </div>
 
@@ -69,16 +107,30 @@
                         أعمال السنة
                     </button>
                     <button class="sidebar-link" data-target="predictor-tab" data-title="توقعات الدرجات">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
                             <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
                         </svg>
                         التوقعات
                     </button>
                     <button class="sidebar-link" data-target="gpa-tab" data-title="السجل الأكاديمي (GPA)">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path
+                                d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z">
+                            </path>
                         </svg>
-                        السجل الأكاديمي
+                        GPA
+                    </button>
+                    <button class="sidebar-link" data-target="settings-tab" data-title="الإعدادات">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3"></circle>
+                            <path
+                                d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z">
+                            </path>
+                        </svg>
+                        الإعدادات
                     </button>
                 </nav>
 
@@ -116,7 +168,6 @@
 
                     <!-- TAB CONTENT: YEAR WORK -->
                     <div id="year-work-tab" class="tab-content active hidden">
-                        <div id="year-work-cache-container"></div>
 
                         <div class="filter-controls">
                             <div class="year-select-group">
@@ -145,19 +196,64 @@
 
                     <!-- TAB CONTENT: PREDICTOR -->
                     <div id="predictor-tab" class="tab-content hidden">
-                        <div id="predictor-cache-container"></div>
                         <div id="predictor-container" class="grades-container"></div>
                     </div>
 
                     <!-- TAB CONTENT: GPA -->
                     <div id="gpa-tab" class="tab-content hidden">
-                        <div id="gpa-cache-container"></div>
                         <div id="gpa-container" class="grades-container"></div>
+                    </div>
+
+                    <!-- TAB CONTENT: SETTINGS -->
+                    <div id="settings-tab" class="tab-content hidden">
+                        <div class="term-section">
+                            <div class="term-header">
+                                <h2>معلومات التطبيق</h2>
+                            </div>
+                            <div class="term-content" style="grid-template-columns: 1fr;">
+                                <div class="subject-card" style="box-shadow: none;">
+                                    <ul class="subject-grades">
+                                        <li>
+                                            <span class="grade-label">إصدار النظام</span>
+                                            <span id="app-web-version" class="grade-value">جاري التحميل...</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Clickable Developer & Github logos -->
+                        <div class="settings-logos-container">
+                            <a href="https://github.com/ibrahim317/ums-frontend" target="_blank" rel="noopener noreferrer" class="settings-logo-link" title="Github">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                                </svg>
+                            </a>
+                            <a href="https://iaboelsoud.com" target="_blank" rel="noopener noreferrer" class="settings-logo-link" title="iaboelsoud.com">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="2" y1="12" x2="22" y2="12"></line>
+                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                </svg>
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </main>
+
+    <!-- Confirmation Modal -->
+    <div id="confirm-modal" class="modal-overlay hidden">
+        <div class="confirm-card">
+            <h3>تأكيد الحذف</h3>
+            <p id="confirm-modal-message">هل أنت متأكد من رغبتك في حذف هذا الحساب؟</p>
+            <div class="confirm-actions">
+                <button id="confirm-yes-btn" class="danger-btn">حذف</button>
+                <button id="confirm-no-btn" class="secondary-btn">إلغاء</button>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="js/main.js"></script>
 </body>

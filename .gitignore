@@ -41,3 +41,4 @@ dump.js
 dump.json
 
 build/
+*.apk

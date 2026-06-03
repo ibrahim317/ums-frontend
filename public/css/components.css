@@ -319,3 +319,287 @@ select:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
+
+@media (max-width: 576px) {
+    .cache-indicator {
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        text-align: center;
+    }
+
+    .cache-time {
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .revalidate-btn {
+        width: 100%;
+        justify-content: center;
+        border: 1px solid rgba(29, 78, 216, 0.2);
+        background: rgba(29, 78, 216, 0.05);
+        padding: 8px 12px;
+    }
+}
+
+/* Saved Accounts Styles */
+.saved-accounts-section {
+    margin-top: 24px;
+    border-top: 1px dashed var(--border-color);
+    padding-top: 16px;
+}
+
+.saved-accounts-divider {
+    text-align: center;
+    position: relative;
+    margin-bottom: 16px;
+    margin-top: -28px;
+}
+
+.saved-accounts-divider span {
+    background: var(--card-bg);
+    padding: 0 12px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+}
+
+.saved-accounts-header {
+    margin-bottom: 12px;
+    text-align: center;
+}
+
+.saved-accounts-header h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+}
+
+.saved-accounts-header p {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.saved-accounts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 180px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.saved-account-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    background: var(--border-soft);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.saved-account-item:hover {
+    background: var(--banner-bg);
+    border-color: var(--accent-color);
+}
+
+.saved-account-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    pointer-events: none;
+}
+
+.saved-account-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--accent-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.9rem;
+}
+
+.saved-account-username {
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    text-align: right;
+    word-break: break-all;
+}
+
+.saved-account-remove-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.saved-account-remove-btn:hover {
+    color: #DC2626;
+    background: rgba(220, 38, 38, 0.1);
+}
+
+.saved-account-remove-btn svg {
+    pointer-events: none;
+}
+
+/* Custom Confirmation Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 1;
+    transition: opacity 0.2s ease;
+    backdrop-filter: blur(4px);
+}
+
+.confirm-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 24px;
+    width: 90%;
+    max-width: 380px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.confirm-card h3 {
+    margin-bottom: 12px;
+    font-size: 1.1rem;
+    color: var(--text-primary);
+}
+
+.confirm-card p {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.danger-btn {
+    background: #DC2626;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    font-family: 'Cairo', sans-serif;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex: 1;
+}
+
+.danger-btn:hover {
+    background: #B91C1C;
+}
+
+.confirm-actions .secondary-btn {
+    flex: 1;
+}
+
+/* Settings logo styles */
+.settings-logos-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-top: 24px;
+    padding: 10px;
+}
+
+.settings-logo-link {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: var(--panel-bg);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    box-shadow: none;
+}
+
+.settings-logo-link:hover {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+    transform: scale(1.1);
+    background: var(--border-soft);
+}
+
+/* Nav Cache Info Styling */
+.nav-cache-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    background: var(--border-soft);
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color);
+    direction: ltr; /* Keeps time and icon aligned nicely */
+}
+
+.nav-cache-time {
+    font-weight: 600;
+    font-family: monospace, sans-serif;
+}
+
+.nav-revalidate-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border-radius: 50%;
+    transition: transform 0.2s, color 0.2s;
+}
+
+.nav-revalidate-btn:hover {
+    color: var(--accent-color);
+    transform: rotate(30deg);
+}
+
+.nav-revalidate-btn.spinning svg {
+    animation: nav-spin 1s linear infinite;
+}
+
+@keyframes nav-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}

@@ -1,4 +1,4 @@
-export const renderGPA = (containerId, data) => {
+export const renderGPA = (containerId, data, onSubjectOpen) => {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
 
@@ -79,15 +79,26 @@ export const renderGPA = (containerId, data) => {
             term.subjects.forEach(subject => {
                 const card = document.createElement('div');
                 card.className = 'subject-card';
+
+                const openBtn = onSubjectOpen ? `<button class="subject-open-btn" data-subject="${subject.name}">فتح</button>` : '';
                 
                 card.innerHTML = `
-                    <h3>${subject.name}</h3>
+                    <h3>${subject.name}${openBtn}</h3>
                     <ul class="subject-grades">
                         <li><span class="grade-label">ساعات المقرر:</span> <span class="grade-value">${subject.hours}</span></li>
                         <li><span class="grade-label">التقدير:</span> <span class="grade-value">${subject.grade}</span></li>
                         <li><span class="grade-label">النقاط:</span> <span class="grade-value">${subject.points}</span></li>
                     </ul>
                 `;
+
+                if (onSubjectOpen) {
+                    const btn = card.querySelector('.subject-open-btn');
+                    if (btn) btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        onSubjectOpen(subject.name);
+                    });
+                }
+
                 content.appendChild(card);
             });
 

@@ -1,4 +1,4 @@
-export const renderYearWorkGrades = (containerId, data) => {
+export const renderYearWorkGrades = (containerId, data, onSubjectOpen) => {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
 
@@ -38,10 +38,21 @@ export const renderYearWorkGrades = (containerId, data) => {
             });
             gradesHtml += '</ul>';
 
+            const openBtn = onSubjectOpen ? `<button class="subject-open-btn" data-subject="${subject.name}">فتح</button>` : '';
+
             card.innerHTML = `
-                <h3>${subject.name}</h3>
+                <h3>${subject.name}${openBtn}</h3>
                 ${gradesHtml}
             `;
+
+            if (onSubjectOpen) {
+                const btn = card.querySelector('.subject-open-btn');
+                if (btn) btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    onSubjectOpen(subject.name);
+                });
+            }
+
             content.appendChild(card);
         });
 

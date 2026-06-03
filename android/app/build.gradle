@@ -3,6 +3,15 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.ums.studentportal"
     compileSdk = rootProject.ext.compileSdkVersion
+    signingConfigs {
+        release {
+            storeFile file('release.keystore')
+            storePassword 'studentportal'
+            keyAlias 'releaseKey'
+            keyPassword 'studentportal'
+        }
+    }
+
     defaultConfig {
         applicationId "com.ums.studentportal"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -18,6 +27,7 @@ android {
     }
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
