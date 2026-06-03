@@ -26,6 +26,9 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/cli": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
     "axios": "^1.16.1",
     "better-sqlite3": "^12.10.0",
     "cheerio": "^1.2.0",

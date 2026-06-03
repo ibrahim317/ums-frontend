@@ -1,0 +1,13 @@
+{
+  "appId": "com.ums.studentportal",
+  "appName": "Student Grades Portal",
+  "webDir": "public",
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "CapacitorCookies": {
+      "enabled": true
+    }
+  }
+}
