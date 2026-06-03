@@ -64,6 +64,39 @@ const isNewerVersion = (latest, current) => {
     return false;
 };
 
+// Register global download progress listener if Capacitor exists
+if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater) {
+    try {
+        window.Capacitor.Plugins.AppUpdater.addListener('downloadProgress', (info) => {
+            const progress = info.progress || 0;
+            
+            // 1. Update modal progress
+            const modalProgressContainer = document.getElementById('update-progress-container');
+            const modalProgressText = document.getElementById('update-progress-text');
+            const modalProgressBar = document.getElementById('update-progress-bar');
+            
+            if (modalProgressContainer && modalProgressText && modalProgressBar) {
+                modalProgressContainer.classList.remove('hidden');
+                modalProgressText.textContent = `${progress}%`;
+                modalProgressBar.style.width = `${progress}%`;
+            }
+
+            // 2. Update settings tab progress
+            const settingsProgressContainer = document.getElementById('settings-update-progress-container');
+            const settingsProgressText = document.getElementById('settings-update-progress-text');
+            const settingsProgressBar = document.getElementById('settings-update-progress-bar');
+            
+            if (settingsProgressContainer && settingsProgressText && settingsProgressBar) {
+                settingsProgressContainer.classList.remove('hidden');
+                settingsProgressText.textContent = `${progress}%`;
+                settingsProgressBar.style.width = `${progress}%`;
+            }
+        });
+    } catch (e) {
+        console.error('Failed to register download progress listener:', e);
+    }
+}
+
 const showUpdateModal = (version, downloadUrl) => {
     const updateModal = document.getElementById('update-modal');
     const updateMsg = document.getElementById('update-modal-message');
@@ -74,27 +107,40 @@ const showUpdateModal = (version, downloadUrl) => {
 
     updateMsg.textContent = `يتوفر إصدار جديد من التطبيق (${version}). هل تريد تحميل التحديث الآن؟`;
     
-    // Reset buttons state
+    // Reset buttons state and progress container
     downloadBtn.textContent = 'تحميل';
     downloadBtn.disabled = false;
     closeBtn.classList.remove('hidden');
+    
+    const progressContainer = document.getElementById('update-progress-container');
+    const progressBar = document.getElementById('update-progress-bar');
+    const progressText = document.getElementById('update-progress-text');
+    if (progressContainer && progressBar && progressText) {
+        progressContainer.classList.add('hidden');
+        progressBar.style.width = '0%';
+        progressText.textContent = '0%';
+    }
 
     downloadBtn.onclick = async () => {
         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater) {
             downloadBtn.textContent = 'جاري التحميل...';
             downloadBtn.disabled = true;
             closeBtn.classList.add('hidden'); // Prevent closing while downloading to avoid interruption
-            updateMsg.textContent = 'جاري تحميل ملف التحديث في الخلفية. يرجى الانتظار، ستظهر شاشة التثبيت فور اكتمال التحميل.';
+            
+            if (progressContainer) progressContainer.classList.remove('hidden');
+            updateMsg.textContent = 'جاري تحميل ملف التحديث الجديد. ستظهر لك شاشة التثبيت فور اكتماله.';
             
             try {
                 await window.Capacitor.Plugins.AppUpdater.downloadAndInstallApk({ url: downloadUrl });
-                // Hide modal on success
+                // Hide modal and reset progress on success
                 updateModal.classList.add('hidden');
+                if (progressContainer) progressContainer.classList.add('hidden');
             } catch (e) {
                 console.error("Native update failed:", e);
                 // Fallback to browser download if native fails
                 window.open(downloadUrl, '_blank');
                 updateModal.classList.add('hidden');
+                if (progressContainer) progressContainer.classList.add('hidden');
             }
         } else {
             window.open(downloadUrl, '_blank');
@@ -149,22 +195,34 @@ const checkUpdates = async (isManual = false) => {
                     downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
                     downloadUpdateBtn.disabled = false;
                     
+                    const progressContainer = document.getElementById('settings-update-progress-container');
+                    const progressBar = document.getElementById('settings-update-progress-bar');
+                    const progressText = document.getElementById('settings-update-progress-text');
+                    if (progressContainer && progressBar && progressText) {
+                        progressContainer.classList.add('hidden');
+                        progressBar.style.width = '0%';
+                        progressText.textContent = '0%';
+                    }
+                    
                     downloadUpdateBtn.onclick = async () => {
                         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater) {
                             downloadUpdateBtn.textContent = 'جاري تحميل التحديث...';
                             downloadUpdateBtn.disabled = true;
+                            if (progressContainer) progressContainer.classList.remove('hidden');
                             updateStatusText.textContent = 'جاري تحميل ملف التحديث في الخلفية. ستظهر لك شاشة التثبيت فور الاكتمال.';
                             try {
                                 await window.Capacitor.Plugins.AppUpdater.downloadAndInstallApk({ url: downloadUrl });
                                 downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
                                 downloadUpdateBtn.disabled = false;
                                 updateStatusText.textContent = `تم تحميل وتثبيت التحديث ${latestVersion}.`;
+                                if (progressContainer) progressContainer.classList.add('hidden');
                             } catch (e) {
                                 console.error("Native update failed:", e);
                                 window.open(downloadUrl, '_blank');
                                 downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
                                 downloadUpdateBtn.disabled = false;
                                 updateStatusText.textContent = 'فشل التحميل التلقائي. تم فتح رابط التحميل في المتصفح.';
+                                if (progressContainer) progressContainer.classList.add('hidden');
                             }
                         } else {
                             window.open(downloadUrl, '_blank');

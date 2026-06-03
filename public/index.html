@@ -244,6 +244,15 @@
                                         <li id="update-status-li" class="hidden" style="flex-direction: column; align-items: flex-start; gap: 8px; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 8px;">
                                             <span id="update-status-text" style="font-size: 0.9rem; color: var(--gold);">يتوفر تحديث جديد!</span>
                                             <button id="download-update-btn" class="primary-btn hidden" style="padding: 8px 16px; font-size: 0.85rem; margin: 0; width: 100%; min-height: unset; height: 36px; line-height: 20px;">تحميل التحديث الآن</button>
+                                            <div id="settings-update-progress-container" class="hidden" style="width: 100%; margin-top: 8px;">
+                                                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; color: var(--gold);">
+                                                    <span>جاري تحميل التحديث...</span>
+                                                    <span id="settings-update-progress-text">0%</span>
+                                                </div>
+                                                <div style="width: 100%; height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                                                    <div id="settings-update-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--gold) 0%, #ffdf7a 100%); transition: width 0.2s ease;"></div>
+                                                </div>
+                                            </div>
                                         </li>
                                     </ul>
                                 </div>
@@ -296,6 +305,15 @@
         <div class="confirm-card">
             <h3>تحديث جديد متاح</h3>
             <p id="update-modal-message">يتوفر إصدار جديد من التطبيق. هل تريد تحميل التحديث الآن؟</p>
+            <div id="update-progress-container" class="hidden" style="width: 100%; margin: 15px 0;">
+                <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 5px; color: var(--gold);">
+                    <span>جاري تحميل التحديث...</span>
+                    <span id="update-progress-text">0%</span>
+                </div>
+                <div style="width: 100%; height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden;">
+                    <div id="update-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, var(--gold) 0%, #ffdf7a 100%); transition: width 0.2s ease;"></div>
+                </div>
+            </div>
             <div class="confirm-actions">
                 <button id="update-download-btn" class="primary-btn" style="margin: 0;">تحميل</button>
                 <button id="update-close-btn" class="secondary-btn" style="margin: 0;">لاحقاً</button>
