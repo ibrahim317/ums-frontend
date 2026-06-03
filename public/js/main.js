@@ -270,8 +270,7 @@ const showError = (msg) => {
 
 const checkAndUnlockSearch = () => {
     const hasGPA = !!cachedGPAData;
-    const hasAllYears = cachedAcademicYears && cachedAcademicYears.every(y => cachedYearWorkData.has(y.Value));
-    if (hasGPA && hasAllYears) {
+    if (hasGPA) {
         setSearchUnlocked(true);
     } else {
         setSearchUnlocked(false);
@@ -304,6 +303,7 @@ const backgroundPrefetchAll = async () => {
             cachedGPAData = data.data;
             gpaCacheTime = data.updatedAt;
             setGPAData(data.data);
+            checkAndUnlockSearch(); // Unlock search as soon as GPA is loaded
         }
     } catch (err) {
         console.warn('Background GPA prefetch failed:', err);
@@ -723,7 +723,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     cachedGPAData = data.data;
                     gpaCacheTime = data.updatedAt;
                     setGPAData(data.data);
+                    checkAndUnlockSearch(); // Unlock immediately when GPA is loaded
+                } else {
+                    throw new Error(data.error || 'فشلت مزامنة السجل الأكاديمي.');
                 }
+            } else {
+                checkAndUnlockSearch();
             }
 
             // 2. Fetch all academic years if not cached
@@ -739,10 +744,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             }
-            checkAndUnlockSearch();
         } catch (err) {
             console.error('مزامنة البحث فشلت:', err);
-            alert('فشلت المزامنة: ' + (err.message || 'خطأ غير معروف'));
+            alert('فشلت المزامنة: ' + (err.message || String(err) || 'خطأ غير معروف'));
         } finally {
             setSearchSyncing(false);
         }

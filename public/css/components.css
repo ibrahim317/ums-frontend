@@ -20,6 +20,8 @@
     font-family: 'Cairo', sans-serif;
     font-size: 0.9rem;
     transition: border-color 0.2s, box-shadow 0.2s;
+    direction: ltr;
+    text-align: right;
 }
 
 .form-group input:focus {
@@ -434,6 +436,7 @@ select:disabled {
     font-weight: 600;
     text-align: right;
     word-break: break-all;
+    direction: ltr;
 }
 
 .saved-account-remove-btn {

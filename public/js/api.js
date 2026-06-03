@@ -84,12 +84,13 @@ export const fetchYearWorkGrades = async (yearId, force = false) => {
             return createFetchLikeResponse(200, true, result.data, null, result.updatedAt);
         } catch (error) {
             console.error('API Fetch Year Work Grades Error:', error);
-            const isAuthError = error.message.includes('credentials not found') || error.message.includes('again');
+            const errMsg = error?.message || (typeof error === 'string' ? error : '') || 'فشل في جلب درجات أعمال السنة.';
+            const isAuthError = errMsg.includes('credentials not found') || errMsg.includes('again');
             return createFetchLikeResponse(
                 isAuthError ? 401 : 500,
                 false,
                 null,
-                error.message || 'فشل في جلب درجات أعمال السنة.'
+                errMsg
             );
         }
     } else {
@@ -112,12 +113,13 @@ export const fetchGPA = async (force = false) => {
             return createFetchLikeResponse(200, true, result.data, null, result.updatedAt);
         } catch (error) {
             console.error('API Fetch GPA Error:', error);
-            const isAuthError = error.message.includes('credentials not found') || error.message.includes('again');
+            const errMsg = error?.message || (typeof error === 'string' ? error : '') || 'فشل في جلب السجل الأكاديمي.';
+            const isAuthError = errMsg.includes('credentials not found') || errMsg.includes('again');
             return createFetchLikeResponse(
                 isAuthError ? 401 : 500,
                 false,
                 null,
-                error.message || 'فشل في جلب السجل الأكاديمي.'
+                errMsg
             );
         }
     } else {
