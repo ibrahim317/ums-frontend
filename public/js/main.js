@@ -41,7 +41,7 @@ const pageTitle = document.getElementById('page-title');
 const yearSelect = document.getElementById('year-select');
 
 // --- State ---
-const CURRENT_APP_VERSION = '1.0.5';
+const CURRENT_APP_VERSION = '1.0.2';
 let cachedAcademicYears = null;
 let yearWorkCacheTime = null;
 let gpaCacheTime = null;
@@ -69,12 +69,12 @@ if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App
     try {
         window.Capacitor.Plugins.AppUpdater.addListener('downloadProgress', (info) => {
             const progress = info.progress || 0;
-            
+
             // 1. Update modal progress
             const modalProgressContainer = document.getElementById('update-progress-container');
             const modalProgressText = document.getElementById('update-progress-text');
             const modalProgressBar = document.getElementById('update-progress-bar');
-            
+
             if (modalProgressContainer && modalProgressText && modalProgressBar) {
                 modalProgressContainer.classList.remove('hidden');
                 modalProgressText.textContent = `${progress}%`;
@@ -85,7 +85,7 @@ if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App
             const settingsProgressContainer = document.getElementById('settings-update-progress-container');
             const settingsProgressText = document.getElementById('settings-update-progress-text');
             const settingsProgressBar = document.getElementById('settings-update-progress-bar');
-            
+
             if (settingsProgressContainer && settingsProgressText && settingsProgressBar) {
                 settingsProgressContainer.classList.remove('hidden');
                 settingsProgressText.textContent = `${progress}%`;
@@ -106,12 +106,12 @@ const showUpdateModal = (version, downloadUrl) => {
     if (!updateModal) return;
 
     updateMsg.textContent = `يتوفر إصدار جديد من التطبيق (${version}). هل تريد تحميل التحديث الآن؟`;
-    
+
     // Reset buttons state and progress container
     downloadBtn.textContent = 'تحميل';
     downloadBtn.disabled = false;
     closeBtn.classList.remove('hidden');
-    
+
     const progressContainer = document.getElementById('update-progress-container');
     const progressBar = document.getElementById('update-progress-bar');
     const progressText = document.getElementById('update-progress-text');
@@ -126,10 +126,10 @@ const showUpdateModal = (version, downloadUrl) => {
             downloadBtn.textContent = 'جاري التحميل...';
             downloadBtn.disabled = true;
             closeBtn.classList.add('hidden'); // Prevent closing while downloading to avoid interruption
-            
+
             if (progressContainer) progressContainer.classList.remove('hidden');
             updateMsg.textContent = 'جاري تحميل ملف التحديث الجديد. ستظهر لك شاشة التثبيت فور اكتماله.';
-            
+
             try {
                 await window.Capacitor.Plugins.AppUpdater.downloadAndInstallApk({ url: downloadUrl });
                 // Hide modal and reset progress on success
@@ -173,28 +173,28 @@ const checkUpdates = async (isManual = false) => {
     try {
         const response = await fetch('https://api.github.com/repos/ibrahim317/ums-frontend/releases/latest');
         if (!response.ok) throw new Error('GitHub API error');
-        
+
         const release = await response.json();
         const latestVersion = release.tag_name || '';
         const latestVersionClean = latestVersion.replace(/^v/i, '');
-        
+
         const isNewer = isNewerVersion(latestVersionClean, CURRENT_APP_VERSION);
-        
+
         if (isNewer) {
             const targetAssetName = `SGP-v${latestVersionClean}.apk`;
             const apkAsset = release.assets.find(asset => asset.name === targetAssetName);
-            
+
             if (apkAsset) {
                 const downloadUrl = apkAsset.browser_download_url;
-                
+
                 if (updateStatusLi && updateStatusText && downloadUpdateBtn) {
                     updateStatusLi.classList.remove('hidden');
                     updateStatusText.textContent = `يتوفر تحديث جديد: ${latestVersion}`;
                     downloadUpdateBtn.classList.remove('hidden');
-                    
+
                     downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
                     downloadUpdateBtn.disabled = false;
-                    
+
                     const progressContainer = document.getElementById('settings-update-progress-container');
                     const progressBar = document.getElementById('settings-update-progress-bar');
                     const progressText = document.getElementById('settings-update-progress-text');
@@ -203,7 +203,7 @@ const checkUpdates = async (isManual = false) => {
                         progressBar.style.width = '0%';
                         progressText.textContent = '0%';
                     }
-                    
+
                     downloadUpdateBtn.onclick = async () => {
                         if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater) {
                             downloadUpdateBtn.textContent = 'جاري تحميل التحديث...';
@@ -229,7 +229,7 @@ const checkUpdates = async (isManual = false) => {
                         }
                     };
                 }
-                
+
                 const dismissed = localStorage.getItem('dismissed_update_version');
                 if (!isManual && dismissed !== latestVersion) {
                     showUpdateModal(latestVersion, downloadUrl);
@@ -277,10 +277,10 @@ const checkAuthStatus = () => {
 
 const login = async (e) => {
     e.preventDefault();
-    
+
     const username = document.getElementById('username').value;
     const password = document.getElementById('password').value;
-    
+
     btnText.classList.add('hidden');
     btnLoader.classList.remove('hidden');
     loginBtn.disabled = true;
@@ -345,25 +345,25 @@ const requestLogout = () => {
 const renderSavedAccounts = () => {
     const savedAccountsSection = document.getElementById('saved-accounts-section');
     const savedAccountsList = document.getElementById('saved-accounts-list');
-    
+
     if (!savedAccountsSection || !savedAccountsList) return;
-    
+
     const accounts = getSavedAccounts();
-    
+
     if (accounts.length === 0) {
         savedAccountsSection.classList.add('hidden');
         return;
     }
-    
+
     savedAccountsSection.classList.remove('hidden');
     savedAccountsList.innerHTML = '';
-    
+
     accounts.forEach(acc => {
         const item = document.createElement('div');
         item.className = 'saved-account-item';
-        
+
         const firstLetter = acc.username ? acc.username.charAt(0).toUpperCase() : 'U';
-        
+
         item.innerHTML = `
             <div class="saved-account-info">
                 <div class="saved-account-avatar">${firstLetter}</div>
@@ -378,28 +378,28 @@ const renderSavedAccounts = () => {
                 </svg>
             </button>
         `;
-        
+
         // Handle clicking on the item to login
         item.addEventListener('click', (e) => {
             if (e.target.closest('.saved-account-remove-btn')) {
                 return;
             }
-            
+
             document.getElementById('username').value = acc.username;
             document.getElementById('password').value = acc.password;
-            
+
             // Trigger login form submit
             const event = new Event('submit', { cancelable: true });
             loginForm.dispatchEvent(event);
         });
-        
+
         // Handle clicking on remove button
         const removeBtn = item.querySelector('.saved-account-remove-btn');
         removeBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             showDeleteConfirmation(acc.username);
         });
-        
+
         savedAccountsList.appendChild(item);
     });
 };
@@ -413,14 +413,14 @@ const showConfirmModal = (title, message, yesText, noText, onConfirm) => {
     const messageEl = document.getElementById('confirm-modal-message');
     const yesBtn = document.getElementById('confirm-yes-btn');
     const noBtn = document.getElementById('confirm-no-btn');
-    
+
     if (titleEl) titleEl.textContent = title;
     if (messageEl) messageEl.textContent = message;
     if (yesBtn) {
         yesBtn.textContent = yesText;
     }
     if (noBtn) noBtn.textContent = noText;
-    
+
     confirmCallback = onConfirm;
     confirmModal.classList.remove('hidden');
 };
@@ -451,14 +451,14 @@ const topNavbar = document.getElementById('top-navbar');
 const showLogin = () => {
     loginView.classList.remove('hidden');
     dashboardView.classList.add('hidden');
-    if(topNavbar) topNavbar.classList.add('hidden');
+    if (topNavbar) topNavbar.classList.add('hidden');
     renderSavedAccounts();
 };
 
 const showDashboard = () => {
     loginView.classList.add('hidden');
     dashboardView.classList.remove('hidden');
-    if(topNavbar) topNavbar.classList.remove('hidden');
+    if (topNavbar) topNavbar.classList.remove('hidden');
 };
 
 const showLoginError = (msg) => {
@@ -499,9 +499,9 @@ const initializeDashboard = async () => {
         await loadAcademicYears();
         await loadYearWorkGrades('');
         yearWorkTab.classList.remove('hidden');
-        
+
         checkAndUnlockSearch();
-        
+
         // Start background prefetching to populate search index for all terms/years
         backgroundPrefetchAll();
 
@@ -543,7 +543,7 @@ const backgroundPrefetchAll = async () => {
             }
         }
     }
-    
+
     checkAndUnlockSearch();
 };
 
@@ -554,7 +554,7 @@ const loadAcademicYears = async () => {
     if (data.success) {
         cachedAcademicYears = data.data;
         yearSelect.innerHTML = '';
-        
+
         if (Array.isArray(cachedAcademicYears) && cachedAcademicYears.length > 0) {
             cachedAcademicYears.forEach(year => {
                 const option = document.createElement('option');
@@ -575,18 +575,18 @@ const loadAcademicYears = async () => {
 const updateNavCacheInfo = (updatedAt, onRevalidateCallback) => {
     const navCacheInfo = document.getElementById('nav-cache-info');
     const navCacheTime = document.getElementById('nav-cache-time');
-    
+
     if (!navCacheInfo || !navCacheTime) return;
-    
+
     if (!updatedAt) {
         navCacheInfo.classList.add('hidden');
         currentRevalidateCallback = null;
         return;
     }
-    
+
     navCacheInfo.classList.remove('hidden');
     currentRevalidateCallback = onRevalidateCallback;
-    
+
     // Format date safely
     let dateStr = updatedAt;
     if (typeof dateStr === 'string') {
@@ -598,7 +598,7 @@ const updateNavCacheInfo = (updatedAt, onRevalidateCallback) => {
         }
     }
     const date = new Date(dateStr);
-    const timeStr = !isNaN(date.getTime()) 
+    const timeStr = !isNaN(date.getTime())
         ? date.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: 'numeric', hour12: true })
         : 'الآن';
     navCacheTime.textContent = timeStr;
@@ -618,7 +618,7 @@ const loadPredictorData = async (force = false) => {
         predictorTab.classList.remove('hidden');
         return;
     }
-    
+
     showLoader();
     const navRevalidateBtn = document.getElementById('nav-revalidate-btn');
     if (force && navRevalidateBtn) {
@@ -632,28 +632,28 @@ const loadPredictorData = async (force = false) => {
         if (data.success) {
             currentYearWorkGrades = data.data;
             currentYearWorkCacheTime = data.updatedAt;
-            
+
             cachedYearWorkData.set('', { data: data.data, updatedAt: data.updatedAt });
-            
+
             renderPredictor('predictor-container', currentYearWorkGrades);
-            
+
             // If the user hasn't selected another year in the year-work dropdown,
             // we can also update the year work tab's cache time and grades display.
-            if (!yearSelect.value) { 
+            if (!yearSelect.value) {
                 renderYearWorkGrades('grades-container', data.data, openSubjectByName);
                 yearWorkCacheTime = data.updatedAt;
             }
-            
+
             const ywYearLabel = yearSelect.options[yearSelect.selectedIndex]?.text || '';
             if (ywYearLabel) addYearWorkData(ywYearLabel, data.data);
             setCurrentYearWorkGrades(currentYearWorkGrades, ywYearLabel);
-            
+
             const activeLink = document.querySelector('.sidebar-link.active');
             const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
             if (activeTargetId === 'predictor-tab') {
                 updateNavCacheInfo(currentYearWorkCacheTime, () => loadPredictorData(true));
             }
-            
+
             hideLoader();
             predictorTab.classList.remove('hidden');
         } else {
@@ -673,12 +673,12 @@ const loadYearWorkGrades = async (yearId, force = false) => {
         const cached = cachedYearWorkData.get(yearId);
         renderYearWorkGrades('grades-container', cached.data, openSubjectByName);
         yearWorkCacheTime = cached.updatedAt;
-        
+
         if (yearId === '') {
             currentYearWorkGrades = cached.data;
             currentYearWorkCacheTime = cached.updatedAt;
             renderPredictor('predictor-container', currentYearWorkGrades);
-            
+
             let ywYearLabel = '';
             if (cachedAcademicYears) {
                 const opt = cachedAcademicYears.find(y => y.Value === yearId);
@@ -689,7 +689,7 @@ const loadYearWorkGrades = async (yearId, force = false) => {
             }
             setCurrentYearWorkGrades(currentYearWorkGrades, ywYearLabel);
         }
-        
+
         const activeLink = document.querySelector('.sidebar-link.active');
         const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
         if (activeTargetId === 'year-work-tab') {
@@ -711,16 +711,16 @@ const loadYearWorkGrades = async (yearId, force = false) => {
 
         if (data.success) {
             cachedYearWorkData.set(yearId, { data: data.data, updatedAt: data.updatedAt });
-            
+
             renderYearWorkGrades('grades-container', data.data, openSubjectByName);
-            
+
             // If we are loading the default/latest year (yearId === '')
             if (yearId === '') {
                 currentYearWorkGrades = data.data;
                 currentYearWorkCacheTime = data.updatedAt;
                 renderPredictor('predictor-container', currentYearWorkGrades);
             }
-            
+
             let ywYearLabel = '';
             if (cachedAcademicYears) {
                 const opt = cachedAcademicYears.find(y => y.Value === yearId);
@@ -735,14 +735,14 @@ const loadYearWorkGrades = async (yearId, force = false) => {
             if (yearId === '') {
                 setCurrentYearWorkGrades(currentYearWorkGrades, ywYearLabel);
             }
-            
+
             yearWorkCacheTime = data.updatedAt;
             const activeLink = document.querySelector('.sidebar-link.active');
             const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
             if (activeTargetId === 'year-work-tab') {
                 updateNavCacheInfo(yearWorkCacheTime, () => loadYearWorkGrades(yearId, true));
             }
-            
+
             checkAndUnlockSearch();
             hideLoader();
             yearWorkTab.classList.remove('hidden');
@@ -809,7 +809,7 @@ const loadSettings = async () => {
     if (cultureSelect) {
         const saved = localStorage.getItem('ums_culture') || 'ar';
         cultureSelect.value = saved;
-        
+
         if (!cultureSelect.dataset.listenerAdded) {
             cultureSelect.dataset.listenerAdded = 'true';
             cultureSelect.addEventListener('change', (e) => {
@@ -850,7 +850,7 @@ const switchTab = async (targetId) => {
     document.querySelectorAll('.sidebar-link').forEach(btn => btn.classList.remove('active'));
     const activeLink = document.querySelector(`[data-target="${targetId}"]`);
     activeLink.classList.add('active');
-    
+
     // Update Page Title dynamically
     pageTitle.textContent = activeLink.getAttribute('data-title');
 
@@ -898,7 +898,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     if (confirmNoBtn) confirmNoBtn.addEventListener('click', hideConfirmModal);
-    
+
     retryBtn.addEventListener('click', () => {
         if (yearWorkTabBtn.classList.contains('active')) {
             initializeDashboard();
