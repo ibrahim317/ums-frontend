@@ -1,3 +1,21 @@
+export const getPointsFromGrade = (gradeStr) => {
+    if (!gradeStr) return null;
+    const g = gradeStr.trim().toUpperCase();
+    if (g === 'A+' || g.includes('امتياز مرتفع') || g.includes('امتياز اول')) return 4.0;
+    if (g === 'A' || g.includes('امتياز')) return 4.0;
+    if (g === 'A-' || g.includes('امتياز منخفض')) return 3.7;
+    if (g === 'B+' || g.includes('جيد جدا مرتفع') || g.includes('جيد جداً مرتفع')) return 3.3;
+    if (g === 'B' || g.includes('جيد جدا') || g.includes('جيد جداً')) return 3.0;
+    if (g === 'B-' || g.includes('جيد جدا منخفض') || g.includes('جيد جداً منخفض')) return 2.7;
+    if (g === 'C+' || g.includes('جيد مرتفع')) return 2.3;
+    if (g === 'C' || g.includes('جيد')) return 2.0;
+    if (g === 'C-' || g.includes('جيد منخفض')) return 1.7;
+    if (g === 'D+' || g.includes('مقبول مرتفع')) return 1.3;
+    if (g === 'D' || g.includes('مقبول')) return 1.0;
+    if (g === 'F' || g === 'E' || g.includes('راسب')) return 0.0;
+    return null;
+};
+
 export const renderGPA = (containerId, data, onSubjectOpen) => {
     const container = document.getElementById(containerId);
     container.innerHTML = '';
@@ -20,9 +38,17 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
                 
                 // Exclude rules based on user request
                 if (name.includes("التدريب الصيفي")) return;
-                if (pointsStr === "" || pointsStr === "لا يوجد") return;
                 
-                const points = parseFloat(pointsStr);
+                let points = parseFloat(pointsStr);
+                if (isNaN(points)) {
+                    const derived = getPointsFromGrade(subject.grade);
+                    if (derived !== null) {
+                        points = derived;
+                    }
+                }
+                
+                if (isNaN(points)) return;
+                
                 const hours = parseFloat(hoursStr);
                 
                 if (!isNaN(points) && !isNaN(hours)) {
@@ -82,12 +108,20 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
 
                 const openBtn = onSubjectOpen ? `<button class="subject-open-btn" data-subject="${subject.name}">فتح</button>` : '';
                 
+                let displayedPoints = subject.points;
+                if (!displayedPoints || displayedPoints === "لا يوجد" || isNaN(parseFloat(displayedPoints))) {
+                    const derived = getPointsFromGrade(subject.grade);
+                    if (derived !== null) {
+                        displayedPoints = `${derived} (تقديري)`;
+                    }
+                }
+
                 card.innerHTML = `
                     <h3>${subject.name}${openBtn}</h3>
                     <ul class="subject-grades">
                         <li><span class="grade-label">ساعات المقرر:</span> <span class="grade-value">${subject.hours}</span></li>
                         <li><span class="grade-label">التقدير:</span> <span class="grade-value">${subject.grade}</span></li>
-                        <li><span class="grade-label">النقاط:</span> <span class="grade-value">${subject.points}</span></li>
+                        <li><span class="grade-label">النقاط:</span> <span class="grade-value">${displayedPoints}</span></li>
                     </ul>
                 `;
 

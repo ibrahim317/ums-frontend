@@ -1,5 +1,6 @@
 // search.js - Subject Search Module
 // Fuzzy search across year work and GPA data with subject detail views
+import { getPointsFromGrade } from './components/GPARenderer.js';
 
 // --- Arabic Text Normalization ---
 const cleanSubjectName = (name) => {
@@ -350,12 +351,20 @@ const showDetail = (item) => {
                     }
                 }
 
+                let displayedPoints = occ.gpaInfo.points;
+                if (!displayedPoints || displayedPoints === "لا يوجد" || isNaN(parseFloat(displayedPoints))) {
+                    const derived = getPointsFromGrade(occ.gpaInfo.grade);
+                    if (derived !== null) {
+                        displayedPoints = `${derived} (تقديري)`;
+                    }
+                }
+
                 html += `<div class="search-detail-section">
                     <div class="search-detail-section-label">الدرجة النهائية</div>
                     <ul class="subject-grades">
                         <li><span class="grade-label">ساعات المقرر:</span><span class="grade-value">${occ.gpaInfo.hours}</span></li>
                         <li><span class="grade-label">التقدير:</span><span class="grade-value">${occ.gpaInfo.grade}</span></li>
-                        <li><span class="grade-label">النقاط:</span><span class="grade-value">${occ.gpaInfo.points}</span></li>
+                        <li><span class="grade-label">النقاط:</span><span class="grade-value">${displayedPoints}</span></li>
                         ${finalEstimateHtml}
                     </ul>
                 </div>`;
