@@ -41,7 +41,7 @@ const pageTitle = document.getElementById('page-title');
 const yearSelect = document.getElementById('year-select');
 
 // --- State ---
-const CURRENT_APP_VERSION = '1.0.3';
+const CURRENT_APP_VERSION = '1.0.4';
 let cachedAcademicYears = null;
 let yearWorkCacheTime = null;
 let gpaCacheTime = null;
