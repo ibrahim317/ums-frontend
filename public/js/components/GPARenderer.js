@@ -35,8 +35,19 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
     };
 
     const getYearStart = (yearStr) => {
-        const match = (yearStr || "").match(/\b(19|20)\d{2}\b/);
-        return match ? parseInt(match[0], 10) : 0;
+        const cleanStr = (yearStr || "")
+            .replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+        const match = cleanStr.match(/\b(19|20)\d{2}\b/);
+        if (match) {
+            return parseInt(match[0], 10) * 10;
+        }
+        const lower = cleanStr.toLowerCase();
+        if (lower.includes("الخامس") || lower.includes("خامسة") || lower.includes("خامسه") || lower.includes("fifth")) return 5;
+        if (lower.includes("الرابع") || lower.includes("رابعة") || lower.includes("رابعه") || lower.includes("fourth")) return 4;
+        if (lower.includes("الثالث") || lower.includes("ثالثة") || lower.includes("ثالثه") || lower.includes("third")) return 3;
+        if (lower.includes("الثاني") || lower.includes("ثانية") || lower.includes("ثانيه") || lower.includes("second")) return 2;
+        if (lower.includes("الأول") || lower.includes("الاول") || lower.includes("أولى") || lower.includes("اولى") || lower.includes("first")) return 1;
+        return 0;
     };
 
     const cleanSubjectName = (name) => {
