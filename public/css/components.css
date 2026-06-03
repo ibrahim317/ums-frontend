@@ -527,6 +527,25 @@ select:disabled {
     flex: 1;
 }
 
+/* Settings select */
+.settings-select {
+    background: var(--input-bg, var(--card-bg));
+    color: var(--text-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: 'Cairo', sans-serif;
+    font-size: 0.875rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+    min-width: 120px;
+}
+
+.settings-select:focus {
+    border-color: var(--accent-color);
+}
+
 /* Settings logo styles */
 .settings-logos-container {
     display: flex;

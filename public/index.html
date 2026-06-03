@@ -26,7 +26,8 @@
             </div>
             <div class="nav-right">
                 <button id="search-nav-btn" class="nav-revalidate-btn" title="بحث">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="11" cy="11" r="8"></circle>
                         <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                     </svg>
@@ -34,7 +35,8 @@
                 <div id="nav-cache-info" class="nav-cache-info hidden">
                     <span id="nav-cache-time" class="nav-cache-time"></span>
                     <button id="nav-revalidate-btn" class="nav-revalidate-btn" title="تحديث البيانات">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="23 4 23 10 17 10"></polyline>
                             <polyline points="1 20 1 14 7 14"></polyline>
                             <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
@@ -208,6 +210,25 @@
                     <div id="settings-tab" class="tab-content hidden">
                         <div class="term-section">
                             <div class="term-header">
+                                <h2>تفضيلات اللغة</h2>
+                            </div>
+                            <div class="term-content" style="grid-template-columns: 1fr;">
+                                <div class="subject-card" style="box-shadow: none;">
+                                    <ul class="subject-grades">
+                                        <li style="align-items: center;">
+                                            <span class="grade-label">لغة اسماء المواد</span>
+                                            <select id="ums-culture-select" class="settings-select">
+                                                <option value="ar">العربية</option>
+                                                <option value="en">English</option>
+                                            </select>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="term-section">
+                            <div class="term-header">
                                 <h2>معلومات التطبيق</h2>
                             </div>
                             <div class="term-content" style="grid-template-columns: 1fr;">
@@ -224,16 +245,24 @@
 
                         <!-- Clickable Developer & Github logos -->
                         <div class="settings-logos-container">
-                            <a href="https://github.com/ibrahim317/ums-frontend" target="_blank" rel="noopener noreferrer" class="settings-logo-link" title="Github">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path>
+                            <a href="https://github.com/ibrahim317/ums-frontend" target="_blank"
+                                rel="noopener noreferrer" class="settings-logo-link" title="Github">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path
+                                        d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22">
+                                    </path>
                                 </svg>
                             </a>
-                            <a href="https://iaboelsoud.com" target="_blank" rel="noopener noreferrer" class="settings-logo-link" title="iaboelsoud.com">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <a href="https://iaboelsoud.com" target="_blank" rel="noopener noreferrer"
+                                class="settings-logo-link" title="iaboelsoud.com">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <circle cx="12" cy="12" r="10"></circle>
                                     <line x1="2" y1="12" x2="22" y2="12"></line>
-                                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+                                    <path
+                                        d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z">
+                                    </path>
                                 </svg>
                             </a>
                         </div>

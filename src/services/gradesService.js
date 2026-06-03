@@ -50,7 +50,7 @@ const fetchYearWorkGrades = async (cookies, yearId) => {
     $('.faq-item').each((i, termEl) => {
         const termTitleRaw = $(termEl).find('.faq-title button').text().replace(/\s+/g, ' ').trim();
         const termTitle = termTitleRaw.replace(/^\d+/, '').trim();
-        
+
         if (!termTitle) return;
 
         const termObj = {
@@ -61,7 +61,7 @@ const fetchYearWorkGrades = async (cookies, yearId) => {
         $(termEl).find('.price-table-box2').each((j, subjectEl) => {
             const subjectName = $(subjectEl).find('span').first().text().replace(/\s+/g, ' ').trim();
             const grades = [];
-            
+
             $(subjectEl).find('ul li').each((k, gradeEl) => {
                 grades.push($(gradeEl).text().trim().replace(/\s+/g, ' '));
             });
@@ -118,18 +118,21 @@ const fetchGPA = async (cookies) => {
 
             $(termEl).find('.price-table-box2').each((k, subjectEl) => {
                 const subjectNameRaw = $(subjectEl).find('h5').first().text().replace(/\s+/g, ' ').trim();
-                const subjectName = subjectNameRaw.replace(/^المقرر:\s*/, '').trim();
+                const subjectName = subjectNameRaw
+                    .replace(/^(المقرر:|Course:)\s*/i, '')
+                    .replace(/^\[.*?\]\s*/, '')
+                    .trim();
 
                 let hours = '', grade = '', points = '';
 
                 // Iterate through the rows to extract Hours, Grade, Points
                 $(subjectEl).find('.row').each((l, rowEl) => {
-                    const label = $(rowEl).find('h5').text().replace(/\s+/g, ' ').trim();
+                    const label = $(rowEl).find('h5').text().replace(/\s+/g, ' ').trim().toLowerCase();
                     const value = $(rowEl).find('p').text().replace(/\s+/g, ' ').trim();
 
-                    if (label.includes('ساعات المقرر')) hours = value;
-                    else if (label.includes('التقدير')) grade = value;
-                    else if (label.includes('النقاط')) points = value;
+                    if (label.includes('ساعات المقرر') || label.toLowerCase().includes('hours')) hours = value;
+                    else if (label.includes('التقدير') || label.toLowerCase().includes('grade')) grade = value;
+                    else if (label.includes('النقاط') || label.toLowerCase().includes('points')) points = value;
                 });
 
                 termObj.subjects.push({

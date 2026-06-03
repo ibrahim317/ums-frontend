@@ -12,12 +12,14 @@ const isCapacitor = !!window.Capacitor?.Plugins?.CapacitorHttp;
 const httpClient = new HttpClient();
 const storageService = new StorageService();
 const umsParser = new UmsParser();
-const umsService = new UmsService(httpClient, storageService, umsParser);
+const getCulture = () => localStorage.getItem('ums_culture') || 'ar';
+const umsService = new UmsService(httpClient, storageService, umsParser, getCulture);
 
 // --- Helpers for Browser Fallback ---
 const getBrowserHeaders = () => ({
     'Authorization': `Bearer ${getToken()}`,
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'X-Culture': getCulture()
 });
 
 const createFetchLikeResponse = (status, success, data, error = null, updatedAt = null) => {

@@ -9,13 +9,36 @@ export class UmsService {
      * @param {HttpClient} httpClient 
      * @param {StorageService} storageService 
      * @param {UmsParser} umsParser 
+     * @param {Function} getCulture - returns 'ar' or 'en'
      */
-    constructor(httpClient, storageService, umsParser) {
+    constructor(httpClient, storageService, umsParser, getCulture = () => 'ar') {
         this.http = httpClient;
         this.storage = storageService;
         this.parser = umsParser;
+        this.getCulture = getCulture;
         this.activeCookies = null;
         this.activeCookiesTime = null;
+    }
+
+    /** Appends Culture cookie to an existing cookie string */
+    _withCulture(cookies) {
+        const culture = this.getCulture();
+        // Remove any existing Culture cookie to avoid duplicates
+        const cleaned = cookies.split(/;\s*/).filter(c => !c.trim().startsWith('Culture=')).join('; ');
+        return `${cleaned}; Culture=${culture}`;
+    }
+
+    /** Returns a lang-suffixed cache key; migrates old (no-suffix) keys as Arabic */
+    _cacheKey(base) {
+        const lang = this.getCulture();
+        const suffixedKey = `${base}_${lang}`;
+        // Backward compat: if suffixed key doesn't exist but old unsuffixed key does, treat it as _ar
+        if (lang === 'ar' && !this.storage.getItem(suffixedKey) && this.storage.getItem(base)) {
+            const old = this.storage.getItem(base);
+            this.storage.setItem(suffixedKey, old);
+            // keep old key intact for safety
+        }
+        return suffixedKey;
     }
 
     /**
@@ -165,7 +188,7 @@ export class UmsService {
      * Cache TTL: 24 hours.
      */
     async getAcademicYears() {
-        const cacheKey = 'cache_academic_years';
+        const cacheKey = this._cacheKey('cache_academic_years');
         const cached = this.storage.getCache(cacheKey, 24 * 60 * 60 * 1000);
         if (cached) {
             return { success: true, data: cached.data, cached: true };
@@ -179,7 +202,7 @@ export class UmsService {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
                 'Accept': 'application/json, text/javascript, */*; q=0.01',
                 'Referer': 'https://ums.asu.edu.eg/YearWorkGradesForStudent',
-                'Cookie': cookies,
+                'Cookie': this._withCulture(cookies),
                 'X-Requested-With': 'XMLHttpRequest'
             }
         });
@@ -194,7 +217,7 @@ export class UmsService {
      * Cache TTL: 5 minutes.
      */
     async getYearWorkGrades(yearId, force = false) {
-        const cacheKey = `cache_yearwork_${yearId || 'default'}`;
+        const cacheKey = this._cacheKey(`cache_yearwork_${yearId || 'default'}`);
         if (!force) {
             const cached = this.storage.getCache(cacheKey, 5 * 60 * 1000);
             if (cached) {
@@ -203,6 +226,7 @@ export class UmsService {
         }
 
         const cookies = await this.getValidCookies();
+        const culturedCookies = this._withCulture(cookies);
         let url = 'https://ums.asu.edu.eg/YearWorkGradesForStudent/StudentYearWorkGrades';
         let response;
 
@@ -215,7 +239,7 @@ export class UmsService {
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                     'Content-Type': 'application/x-www-form-urlencoded',
                     'Referer': 'https://ums.asu.edu.eg/YearWorkGradesForStudent',
-                    'Cookie': cookies
+                    'Cookie': culturedCookies
                 },
                 data: `AcademicYearId=${yearId}`
             });
@@ -228,7 +252,7 @@ export class UmsService {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                     'Referer': 'https://ums.asu.edu.eg/UserInformation/MyAccount',
-                    'Cookie': cookies
+                    'Cookie': culturedCookies
                 }
             });
         }
@@ -245,7 +269,7 @@ export class UmsService {
      * Cache TTL: 6 months.
      */
     async getGPA(force = false) {
-        const cacheKey = 'cache_gpa';
+        const cacheKey = this._cacheKey('cache_gpa');
         if (!force) {
             const cached = this.storage.getCache(cacheKey, 6 * 30 * 24 * 60 * 60 * 1000);
             if (cached) {
@@ -261,7 +285,7 @@ export class UmsService {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                 'Referer': 'https://ums.asu.edu.eg/YearWorkGradesForStudent/StudentYearWorkGrades',
-                'Cookie': cookies
+                'Cookie': this._withCulture(cookies)
             }
         });
 

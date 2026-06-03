@@ -4,6 +4,7 @@
 // --- Arabic Text Normalization ---
 const cleanSubjectName = (name) => {
     return (name || '')
+        .replace(/^(المقرر:|Course:)\s*/i, '')
         .replace(/^\[[^\]]+\]\s*/, '')
         .trim();
 };
@@ -76,6 +77,13 @@ let overlay = null;
 let searchUnlocked = false;
 let onUnlockCallback = null;
 let openedFromCard = false;
+let currentYearWorkGrades = null;
+let currentYearWorkLabel = '';
+
+export const setCurrentYearWorkGrades = (grades, label) => {
+    currentYearWorkGrades = grades;
+    if (label) currentYearWorkLabel = label;
+};
 
 // --- Index Building ---
 export const setGPAData = (data) => {
@@ -236,6 +244,77 @@ const showDetail = (item) => {
                     html += `<li><span class="grade-label">-</span><span class="grade-value">${g}</span></li>`;
                 });
                 html += `</ul></div>`;
+            }
+
+            // Predictions logic
+            let predictorSubject = null;
+            if (currentYearWorkGrades && currentYearWorkGrades.terms && currentYearWorkGrades.terms.length > 0) {
+                const currentTerm = currentYearWorkGrades.terms[currentYearWorkGrades.terms.length - 1];
+                const currentTermNorm = normalizeTermTitle(currentTerm.title);
+                
+                if (yearLabel === currentYearWorkLabel && occ.termTitle === currentTermNorm) {
+                    const targetNormName = normalizeArabic(item.displayName);
+                    predictorSubject = currentTerm.subjects.find(sub => normalizeArabic(sub.name) === targetNormName);
+                }
+            }
+
+            if (predictorSubject) {
+                let maxYearWork = 0;
+                let currentScore = 0;
+
+                predictorSubject.grades.forEach(gradeStr => {
+                    const match = gradeStr.match(/:\s*([\d.]+)\/([\d.]+)/);
+                    if (match) {
+                        currentScore += parseFloat(match[1]);
+                        maxYearWork += parseFloat(match[2]);
+                    }
+                });
+
+                const finalTotal = 100 - maxYearWork;
+                
+                const thresholds = [
+                    { label: 'A+', min: 97, color: '#10B981' },
+                    { label: 'A', min: 93, color: '#10B981' },
+                    { label: 'A-', min: 89, color: '#10B981' },
+                    { label: 'B+', min: 84, color: '#3B82F6' },
+                    { label: 'B', min: 80, color: '#3B82F6' },
+                    { label: 'B-', min: 76, color: '#3B82F6' },
+                    { label: 'C+', min: 73, color: '#F59E0B' },
+                    { label: 'C', min: 70, color: '#F59E0B' },
+                    { label: 'C-', min: 67, color: '#F59E0B' },
+                    { label: 'D+', min: 64, color: '#EF4444' },
+                    { label: 'D', min: 60, color: '#EF4444' }
+                ];
+
+                let predictionHTML = `<div class="search-detail-section" style="margin-top: 12px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                    <div class="search-detail-section-label">توقعات نهاية الفصل الدراسي</div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">
+                        المجموع الحالي: <span style="font-weight: 700; color: var(--accent-color);">${currentScore.toFixed(1)} / ${maxYearWork.toFixed(1)}</span>
+                    </div>
+                    <ul class="subject-grades">`;
+
+                thresholds.forEach(t => {
+                    const needed = t.min - currentScore;
+                    if (needed <= 0) {
+                        predictionHTML += `<li>
+                            <span class="grade-label" style="font-weight: 700; color: ${t.color};">${t.label}:</span>
+                            <span class="grade-value" style="color: ${t.color};">لقد حققت هذا التقدير!</span>
+                        </li>`;
+                    } else if (needed <= finalTotal) {
+                        predictionHTML += `<li>
+                            <span class="grade-label" style="font-weight: 700; color: ${t.color};">${t.label}:</span>
+                            <span class="grade-value" style="color: var(--text-primary);">تحتاج <span style="color: ${t.color}; font-weight: 700;">${needed.toFixed(1)}</span> من ${finalTotal}</span>
+                        </li>`;
+                    } else {
+                        predictionHTML += `<li style="opacity: 0.4;">
+                            <span class="grade-label" style="font-weight: 700;">${t.label}:</span>
+                            <span class="grade-value">مستحيل (تحتاج ${needed.toFixed(1)})</span>
+                        </li>`;
+                    }
+                });
+
+                predictionHTML += `</ul></div>`;
+                html += predictionHTML;
             }
 
             if (occ.gpaInfo) {
@@ -422,4 +501,6 @@ export const clearSearchData = () => {
     gpaData = null;
     yearWorkEntries = [];
     searchIndex = [];
+    currentYearWorkGrades = null;
+    currentYearWorkLabel = '';
 };

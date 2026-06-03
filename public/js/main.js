@@ -3,7 +3,7 @@ import { setToken, removeToken, isAuthenticated, saveAccount, getSavedAccounts, 
 import { renderYearWorkGrades } from './components/YearWorkRenderer.js';
 import { renderGPA } from './components/GPARenderer.js';
 import { renderPredictor } from './components/PredictorRenderer.js';
-import { initSearch, openSearch, openSubjectByName, setGPAData, addYearWorkData, clearSearchData, setSearchUnlocked, setSearchSyncing } from './search.js';
+import { initSearch, openSearch, openSubjectByName, setGPAData, addYearWorkData, clearSearchData, setSearchUnlocked, setSearchSyncing, setCurrentYearWorkGrades } from './search.js';
 
 // --- DOM Elements ---
 const loginView = document.getElementById('login-view');
@@ -91,7 +91,7 @@ const login = async (e) => {
     }
 };
 
-const logout = () => {
+const performLogout = () => {
     removeToken();
     showLogin();
     document.getElementById('grades-container').innerHTML = '';
@@ -109,8 +109,23 @@ const logout = () => {
     hideNavCacheInfo();
 };
 
+const logout = () => {
+    performLogout();
+};
+
+const requestLogout = () => {
+    showConfirmModal(
+        'تسجيل الخروج',
+        'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
+        'خروج',
+        'إلغاء',
+        () => {
+            performLogout();
+        }
+    );
+};
+
 // --- Saved Accounts quick login logic ---
-let accountToDelete = null;
 
 const renderSavedAccounts = () => {
     const savedAccountsSection = document.getElementById('saved-accounts-section');
@@ -174,30 +189,45 @@ const renderSavedAccounts = () => {
     });
 };
 
-const showDeleteConfirmation = (username) => {
-    accountToDelete = username;
+// --- Saved Accounts quick login logic ---
+let confirmCallback = null;
+
+const showConfirmModal = (title, message, yesText, noText, onConfirm) => {
+    if (!confirmModal) return;
+    const titleEl = confirmModal.querySelector('h3');
     const messageEl = document.getElementById('confirm-modal-message');
-    if (messageEl) {
-        messageEl.textContent = `هل أنت متأكد من رغبتك في حذف الحساب "${username}" من هذا الجهاز؟`;
+    const yesBtn = document.getElementById('confirm-yes-btn');
+    const noBtn = document.getElementById('confirm-no-btn');
+    
+    if (titleEl) titleEl.textContent = title;
+    if (messageEl) messageEl.textContent = message;
+    if (yesBtn) {
+        yesBtn.textContent = yesText;
     }
-    if (confirmModal) {
-        confirmModal.classList.remove('hidden');
-    }
+    if (noBtn) noBtn.textContent = noText;
+    
+    confirmCallback = onConfirm;
+    confirmModal.classList.remove('hidden');
 };
 
-const hideDeleteConfirmation = () => {
-    accountToDelete = null;
+const hideConfirmModal = () => {
     if (confirmModal) {
         confirmModal.classList.add('hidden');
     }
+    confirmCallback = null;
 };
 
-const handleConfirmDelete = () => {
-    if (accountToDelete) {
-        removeAccount(accountToDelete);
-        renderSavedAccounts();
-    }
-    hideDeleteConfirmation();
+const showDeleteConfirmation = (username) => {
+    showConfirmModal(
+        'تأكيد الحذف',
+        `هل أنت متأكد من رغبتك في حذف الحساب "${username}" من هذا الجهاز؟`,
+        'حذف',
+        'إلغاء',
+        () => {
+            removeAccount(username);
+            renderSavedAccounts();
+        }
+    );
 };
 
 const topNavbar = document.getElementById('top-navbar');
@@ -339,11 +369,20 @@ const updateNavCacheInfo = (updatedAt, onRevalidateCallback) => {
     navCacheInfo.classList.remove('hidden');
     currentRevalidateCallback = onRevalidateCallback;
     
-    // Format date
-    const date = new Date(updatedAt + 'Z');
-    const timeStr = date.toLocaleTimeString('ar-EG', { 
-        hour: 'numeric', minute: 'numeric', hour12: true 
-    });
+    // Format date safely
+    let dateStr = updatedAt;
+    if (typeof dateStr === 'string') {
+        if (dateStr.includes(' ') && !dateStr.includes('T')) {
+            dateStr = dateStr.replace(' ', 'T');
+        }
+        if (!dateStr.endsWith('Z') && !dateStr.includes('+') && !dateStr.includes('-Z') && !dateStr.includes('Z')) {
+            dateStr += 'Z';
+        }
+    }
+    const date = new Date(dateStr);
+    const timeStr = !isNaN(date.getTime()) 
+        ? date.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: 'numeric', hour12: true })
+        : 'الآن';
     navCacheTime.textContent = timeStr;
 };
 
@@ -389,6 +428,7 @@ const loadPredictorData = async (force = false) => {
             
             const ywYearLabel = yearSelect.options[yearSelect.selectedIndex]?.text || '';
             if (ywYearLabel) addYearWorkData(ywYearLabel, data.data);
+            setCurrentYearWorkGrades(currentYearWorkGrades, ywYearLabel);
             
             const activeLink = document.querySelector('.sidebar-link.active');
             const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
@@ -420,6 +460,16 @@ const loadYearWorkGrades = async (yearId, force = false) => {
             currentYearWorkGrades = cached.data;
             currentYearWorkCacheTime = cached.updatedAt;
             renderPredictor('predictor-container', currentYearWorkGrades);
+            
+            let ywYearLabel = '';
+            if (cachedAcademicYears) {
+                const opt = cachedAcademicYears.find(y => y.Value === yearId);
+                if (opt) ywYearLabel = opt.Text;
+            }
+            if (!ywYearLabel && yearId === '') {
+                ywYearLabel = yearSelect.options[yearSelect.selectedIndex]?.text || '';
+            }
+            setCurrentYearWorkGrades(currentYearWorkGrades, ywYearLabel);
         }
         
         const activeLink = document.querySelector('.sidebar-link.active');
@@ -463,6 +513,9 @@ const loadYearWorkGrades = async (yearId, force = false) => {
             }
             if (ywYearLabel) {
                 addYearWorkData(ywYearLabel, data.data);
+            }
+            if (yearId === '') {
+                setCurrentYearWorkGrades(currentYearWorkGrades, ywYearLabel);
             }
             
             yearWorkCacheTime = data.updatedAt;
@@ -533,6 +586,31 @@ const loadGPA = async (force = false) => {
 
 let fetchedVersion = null;
 const loadSettings = async () => {
+    // Init culture selector
+    const cultureSelect = document.getElementById('ums-culture-select');
+    if (cultureSelect) {
+        const saved = localStorage.getItem('ums_culture') || 'ar';
+        cultureSelect.value = saved;
+        
+        if (!cultureSelect.dataset.listenerAdded) {
+            cultureSelect.dataset.listenerAdded = 'true';
+            cultureSelect.addEventListener('change', (e) => {
+                const newLang = e.target.value;
+                localStorage.setItem('ums_culture', newLang);
+                // Clear in-memory caches so next tab switch re-fetches in the new language
+                cachedGPAData = null;
+                gpaCacheTime = null;
+                cachedAcademicYears = null;
+                cachedYearWorkData.clear();
+                clearSearchData();
+                setSearchUnlocked(false);
+                // Also clear rendered content to avoid stale UI
+                document.getElementById('grades-container').innerHTML = '';
+                document.getElementById('gpa-container').innerHTML = '';
+            });
+        }
+    }
+
     if (fetchedVersion) return;
     try {
         const response = await fetch('/api/version');
@@ -592,11 +670,16 @@ const switchTab = async (targetId) => {
 // --- Event Listeners ---
 document.addEventListener('DOMContentLoaded', () => {
     loginForm.addEventListener('submit', login);
-    logoutBtn.addEventListener('click', logout);
-    if (logoutNavBtn) logoutNavBtn.addEventListener('click', logout);
+    logoutBtn.addEventListener('click', requestLogout);
+    if (logoutNavBtn) logoutNavBtn.addEventListener('click', requestLogout);
 
-    if (confirmYesBtn) confirmYesBtn.addEventListener('click', handleConfirmDelete);
-    if (confirmNoBtn) confirmNoBtn.addEventListener('click', hideDeleteConfirmation);
+    if (confirmYesBtn) {
+        confirmYesBtn.addEventListener('click', () => {
+            if (confirmCallback) confirmCallback();
+            hideConfirmModal();
+        });
+    }
+    if (confirmNoBtn) confirmNoBtn.addEventListener('click', hideConfirmModal);
     
     retryBtn.addEventListener('click', () => {
         if (yearWorkTabBtn.classList.contains('active')) {

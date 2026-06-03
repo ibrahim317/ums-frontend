@@ -28,7 +28,7 @@ export class UmsParser {
             if (!button) return;
             const termTitleRaw = button.textContent.replace(/\s+/g, ' ').trim();
             const termTitle = termTitleRaw.replace(/^\d+/, '').trim();
-            
+
             if (!termTitle) return;
 
             const termObj = {
@@ -42,7 +42,7 @@ export class UmsParser {
                 if (!span) return;
                 const subjectName = span.textContent.replace(/\s+/g, ' ').trim();
                 const grades = [];
-                
+
                 const gradeEls = subjectEl.querySelectorAll('ul li');
                 gradeEls.forEach((gradeEl) => {
                     grades.push(gradeEl.textContent.trim().replace(/\s+/g, ' '));
@@ -102,7 +102,10 @@ export class UmsParser {
                     const h5 = subjectEl.querySelector('h5');
                     if (!h5) return;
                     const subjectNameRaw = h5.textContent.replace(/\s+/g, ' ').trim();
-                    const subjectName = subjectNameRaw.replace(/^المقرر:\s*/, '').trim();
+                    const subjectName = subjectNameRaw
+                        .replace(/^(المقرر:|Course:)\s*/i, '')
+                        .replace(/^\[.*?\]\s*/, '')
+                        .trim();
 
                     let hours = '', grade = '', points = '';
 
@@ -111,12 +114,12 @@ export class UmsParser {
                         const rowH5 = rowEl.querySelector('h5');
                         const rowP = rowEl.querySelector('p');
                         if (!rowH5 || !rowP) return;
-                        const label = rowH5.textContent.replace(/\s+/g, ' ').trim();
+                        const label = rowH5.textContent.replace(/\s+/g, ' ').trim().toLowerCase();
                         const value = rowP.textContent.replace(/\s+/g, ' ').trim();
 
-                        if (label.includes('ساعات المقرر')) hours = value;
-                        else if (label.includes('التقدير')) grade = value;
-                        else if (label.includes('النقاط')) points = value;
+                        if (label.includes('ساعات المقرر') || label.toLowerCase().includes('hours')) hours = value;
+                        else if (label.includes('التقدير') || label.toLowerCase().includes('grade')) grade = value;
+                        else if (label.includes('النقاط') || label.toLowerCase().includes('points')) points = value;
                     });
 
                     termObj.subjects.push({
