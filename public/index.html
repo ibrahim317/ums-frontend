@@ -234,9 +234,16 @@
                             <div class="term-content" style="grid-template-columns: 1fr;">
                                 <div class="subject-card" style="box-shadow: none;">
                                     <ul class="subject-grades">
-                                        <li>
-                                            <span class="grade-label">إصدار النظام</span>
-                                            <span id="app-web-version" class="grade-value">جاري التحميل...</span>
+                                        <li style="align-items: center; justify-content: space-between; gap: 12px;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <span class="grade-label" style="margin-bottom: 0;">إصدار التطبيق:</span>
+                                                <span id="app-web-version" class="grade-value" style="font-weight: bold;">جاري التحميل...</span>
+                                            </div>
+                                            <button id="check-update-btn" class="secondary-btn" style="padding: 6px 12px; font-size: 0.85rem; margin: 0; min-height: unset; height: 32px; line-height: 20px;">التحقق من التحديثات</button>
+                                        </li>
+                                        <li id="update-status-li" class="hidden" style="flex-direction: column; align-items: flex-start; gap: 8px; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 8px;">
+                                            <span id="update-status-text" style="font-size: 0.9rem; color: var(--gold);">يتوفر تحديث جديد!</span>
+                                            <button id="download-update-btn" class="primary-btn hidden" style="padding: 8px 16px; font-size: 0.85rem; margin: 0; width: 100%; min-height: unset; height: 36px; line-height: 20px;">تحميل التحديث الآن</button>
                                         </li>
                                     </ul>
                                 </div>
@@ -280,6 +287,18 @@
             <div class="confirm-actions">
                 <button id="confirm-yes-btn" class="danger-btn">حذف</button>
                 <button id="confirm-no-btn" class="secondary-btn">إلغاء</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Modal -->
+    <div id="update-modal" class="modal-overlay hidden">
+        <div class="confirm-card">
+            <h3>تحديث جديد متاح</h3>
+            <p id="update-modal-message">يتوفر إصدار جديد من التطبيق. هل تريد تحميل التحديث الآن؟</p>
+            <div class="confirm-actions">
+                <button id="update-download-btn" class="primary-btn" style="margin: 0;">تحميل</button>
+                <button id="update-close-btn" class="secondary-btn" style="margin: 0;">لاحقاً</button>
             </div>
         </div>
     </div>

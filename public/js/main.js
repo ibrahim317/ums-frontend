@@ -41,6 +41,7 @@ const pageTitle = document.getElementById('page-title');
 const yearSelect = document.getElementById('year-select');
 
 // --- State ---
+const CURRENT_APP_VERSION = '1.0.3';
 let cachedAcademicYears = null;
 let yearWorkCacheTime = null;
 let gpaCacheTime = null;
@@ -49,6 +50,117 @@ let currentYearWorkCacheTime = null;
 let cachedGPAData = null;
 const cachedYearWorkData = new Map();
 let currentRevalidateCallback = null;
+
+const isNewerVersion = (latest, current) => {
+    const parse = (v) => v.replace(/^v/i, '').split('.').map(Number);
+    const lParts = parse(latest);
+    const cParts = parse(current);
+    for (let i = 0; i < Math.max(lParts.length, cParts.length); i++) {
+        const l = lParts[i] || 0;
+        const c = cParts[i] || 0;
+        if (l > c) return true;
+        if (l < c) return false;
+    }
+    return false;
+};
+
+const showUpdateModal = (version, downloadUrl) => {
+    const updateModal = document.getElementById('update-modal');
+    const updateMsg = document.getElementById('update-modal-message');
+    const downloadBtn = document.getElementById('update-download-btn');
+    const closeBtn = document.getElementById('update-close-btn');
+
+    if (!updateModal) return;
+
+    updateMsg.textContent = `يتوفر إصدار جديد من التطبيق (${version}). هل تريد تحميل التحديث الآن؟`;
+    
+    downloadBtn.onclick = () => {
+        window.open(downloadUrl, '_blank');
+        updateModal.classList.add('hidden');
+    };
+
+    closeBtn.onclick = () => {
+        localStorage.setItem('dismissed_update_version', version);
+        updateModal.classList.add('hidden');
+    };
+
+    updateModal.classList.remove('hidden');
+};
+
+const checkUpdates = async (isManual = false) => {
+    const updateStatusLi = document.getElementById('update-status-li');
+    const updateStatusText = document.getElementById('update-status-text');
+    const downloadUpdateBtn = document.getElementById('download-update-btn');
+    const checkUpdateBtn = document.getElementById('check-update-btn');
+
+    if (isManual) {
+        if (checkUpdateBtn) {
+            checkUpdateBtn.textContent = 'جاري التحقق...';
+            checkUpdateBtn.disabled = true;
+        }
+        if (updateStatusLi) updateStatusLi.classList.add('hidden');
+    }
+
+    try {
+        const response = await fetch('https://api.github.com/repos/ibrahim317/ums-frontend/releases/latest');
+        if (!response.ok) throw new Error('GitHub API error');
+        
+        const release = await response.json();
+        const latestVersion = release.tag_name || '';
+        const latestVersionClean = latestVersion.replace(/^v/i, '');
+        
+        const isNewer = isNewerVersion(latestVersionClean, CURRENT_APP_VERSION);
+        
+        if (isNewer) {
+            const targetAssetName = `SGP-v${latestVersionClean}.apk`;
+            const apkAsset = release.assets.find(asset => asset.name === targetAssetName);
+            
+            if (apkAsset) {
+                const downloadUrl = apkAsset.browser_download_url;
+                
+                if (updateStatusLi && updateStatusText && downloadUpdateBtn) {
+                    updateStatusLi.classList.remove('hidden');
+                    updateStatusText.textContent = `يتوفر تحديث جديد: ${latestVersion}`;
+                    downloadUpdateBtn.classList.remove('hidden');
+                    downloadUpdateBtn.onclick = () => {
+                        window.open(downloadUrl, '_blank');
+                    };
+                }
+                
+                const dismissed = localStorage.getItem('dismissed_update_version');
+                if (!isManual && dismissed !== latestVersion) {
+                    showUpdateModal(latestVersion, downloadUrl);
+                } else if (isManual) {
+                    showUpdateModal(latestVersion, downloadUrl);
+                }
+            } else {
+                if (isManual && updateStatusLi && updateStatusText) {
+                    updateStatusLi.classList.remove('hidden');
+                    updateStatusText.textContent = `يتوفر إصدار جديد ${latestVersion} ولكن لم يتم العثور على ملف APK بعد (${targetAssetName}).`;
+                    if (downloadUpdateBtn) downloadUpdateBtn.classList.add('hidden');
+                }
+            }
+        } else {
+            if (isManual && updateStatusLi && updateStatusText) {
+                updateStatusLi.classList.remove('hidden');
+                updateStatusText.textContent = 'تطبيقك محدث إلى آخر إصدار!';
+                if (downloadUpdateBtn) downloadUpdateBtn.classList.add('hidden');
+            }
+        }
+    } catch (err) {
+        console.error('Failed to check for updates:', err);
+        if (isManual && updateStatusLi && updateStatusText) {
+            updateStatusLi.classList.remove('hidden');
+            updateStatusText.textContent = 'فشل التحقق من وجود تحديثات. يرجى التحقق من اتصالك بالإنترنت.';
+            if (downloadUpdateBtn) downloadUpdateBtn.classList.add('hidden');
+        }
+    } finally {
+        if (checkUpdateBtn) {
+            checkUpdateBtn.textContent = 'التحقق من التحديثات';
+            checkUpdateBtn.disabled = false;
+        }
+    }
+};
 
 // --- App Initialization ---
 const checkAuthStatus = () => {
@@ -289,6 +401,9 @@ const initializeDashboard = async () => {
         
         // Start background prefetching to populate search index for all terms/years
         backgroundPrefetchAll();
+
+        // Check for updates in the background
+        checkUpdates(false);
     } catch (error) {
         showError(error.message || 'حدث خطأ غير متوقع');
     }
@@ -611,6 +726,9 @@ const loadSettings = async () => {
         }
     }
 
+    // Set version number to local constant immediately
+    appWebVersionSpan.textContent = CURRENT_APP_VERSION;
+
     if (fetchedVersion) return;
     try {
         const response = await fetch('/api/version');
@@ -618,12 +736,9 @@ const loadSettings = async () => {
         if (data.success) {
             fetchedVersion = data.version;
             appWebVersionSpan.textContent = fetchedVersion;
-        } else {
-            appWebVersionSpan.textContent = '1.0.0';
         }
     } catch (e) {
-        console.error('Failed to fetch app version:', e);
-        appWebVersionSpan.textContent = '1.0.0';
+        console.warn('Failed to fetch app version from API, using local:', e);
     }
 };
 
@@ -701,6 +816,13 @@ document.addEventListener('DOMContentLoaded', () => {
     gpaTabBtn.addEventListener('click', () => switchTab('gpa-tab'));
     predictorTabBtn.addEventListener('click', () => switchTab('predictor-tab'));
     settingsTabBtn.addEventListener('click', () => switchTab('settings-tab'));
+
+    const checkUpdateBtn = document.getElementById('check-update-btn');
+    if (checkUpdateBtn) {
+        checkUpdateBtn.addEventListener('click', () => {
+            checkUpdates(true);
+        });
+    }
 
     const navRevalidateBtn = document.getElementById('nav-revalidate-btn');
     if (navRevalidateBtn) {
