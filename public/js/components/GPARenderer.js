@@ -25,12 +25,34 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
         return;
     }
 
+    // --- Helper functions for latest attempt detection ---
+    const getTermRank = (title) => {
+        const t = title || "";
+        if (t.includes("الخريف") || t.includes("الأول") || t.includes("الاول") || t.includes("First") || t.toLowerCase().includes("fall")) return 1;
+        if (t.includes("الربيع") || t.includes("الثاني") || t.toLowerCase().includes("spring")) return 2;
+        if (t.includes("الصيف") || t.toLowerCase().includes("summer")) return 3;
+        return 1;
+    };
+
+    const getYearStart = (yearStr) => {
+        const match = (yearStr || "").match(/\b(19|20)\d{2}\b/);
+        return match ? parseInt(match[0], 10) : 0;
+    };
+
+    const cleanSubjectName = (name) => {
+        return (name || '')
+            .replace(/^(المقرر:|Course:)\s*/i, '')
+            .replace(/^\[[^\]]+\]\s*/, '')
+            .trim();
+    };
+
     // --- Calculate Overall GPA ---
-    let totalPoints = 0;
-    let totalHours = 0;
+    const latestSubjects = new Map(); // cleanName -> { points, hours, yearStart, termRank }
 
     data.years.forEach(year => {
+        const yearStart = getYearStart(year.year);
         year.terms.forEach(term => {
+            const termRank = getTermRank(term.title);
             term.subjects.forEach(subject => {
                 const name = subject.name || "";
                 const pointsStr = subject.points || "";
@@ -50,13 +72,26 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
                 if (isNaN(points)) return;
                 
                 const hours = parseFloat(hoursStr);
+                if (isNaN(hours)) return;
                 
-                if (!isNaN(points) && !isNaN(hours)) {
-                    totalPoints += (points * hours);
-                    totalHours += hours;
+                const cleanName = cleanSubjectName(name);
+                const currentEntry = latestSubjects.get(cleanName);
+                const isLater = !currentEntry || 
+                                yearStart > currentEntry.yearStart || 
+                                (yearStart === currentEntry.yearStart && termRank > currentEntry.termRank);
+
+                if (isLater) {
+                    latestSubjects.set(cleanName, { points, hours, yearStart, termRank });
                 }
             });
         });
+    });
+
+    let totalPoints = 0;
+    let totalHours = 0;
+    latestSubjects.forEach(sub => {
+        totalPoints += (sub.points * sub.hours);
+        totalHours += sub.hours;
     });
 
     const overallGPA = totalHours > 0 ? (totalPoints / totalHours).toFixed(3) : "N/A";
