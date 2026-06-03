@@ -74,9 +74,32 @@ const showUpdateModal = (version, downloadUrl) => {
 
     updateMsg.textContent = `يتوفر إصدار جديد من التطبيق (${version}). هل تريد تحميل التحديث الآن؟`;
     
-    downloadBtn.onclick = () => {
-        window.open(downloadUrl, '_blank');
-        updateModal.classList.add('hidden');
+    // Reset buttons state
+    downloadBtn.textContent = 'تحميل';
+    downloadBtn.disabled = false;
+    closeBtn.classList.remove('hidden');
+
+    downloadBtn.onclick = async () => {
+        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater) {
+            downloadBtn.textContent = 'جاري التحميل...';
+            downloadBtn.disabled = true;
+            closeBtn.classList.add('hidden'); // Prevent closing while downloading to avoid interruption
+            updateMsg.textContent = 'جاري تحميل ملف التحديث في الخلفية. يرجى الانتظار، ستظهر شاشة التثبيت فور اكتمال التحميل.';
+            
+            try {
+                await window.Capacitor.Plugins.AppUpdater.downloadAndInstallApk({ url: downloadUrl });
+                // Hide modal on success
+                updateModal.classList.add('hidden');
+            } catch (e) {
+                console.error("Native update failed:", e);
+                // Fallback to browser download if native fails
+                window.open(downloadUrl, '_blank');
+                updateModal.classList.add('hidden');
+            }
+        } else {
+            window.open(downloadUrl, '_blank');
+            updateModal.classList.add('hidden');
+        }
     };
 
     closeBtn.onclick = () => {
@@ -122,8 +145,30 @@ const checkUpdates = async (isManual = false) => {
                     updateStatusLi.classList.remove('hidden');
                     updateStatusText.textContent = `يتوفر تحديث جديد: ${latestVersion}`;
                     downloadUpdateBtn.classList.remove('hidden');
-                    downloadUpdateBtn.onclick = () => {
-                        window.open(downloadUrl, '_blank');
+                    
+                    downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
+                    downloadUpdateBtn.disabled = false;
+                    
+                    downloadUpdateBtn.onclick = async () => {
+                        if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.AppUpdater) {
+                            downloadUpdateBtn.textContent = 'جاري تحميل التحديث...';
+                            downloadUpdateBtn.disabled = true;
+                            updateStatusText.textContent = 'جاري تحميل ملف التحديث في الخلفية. ستظهر لك شاشة التثبيت فور الاكتمال.';
+                            try {
+                                await window.Capacitor.Plugins.AppUpdater.downloadAndInstallApk({ url: downloadUrl });
+                                downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
+                                downloadUpdateBtn.disabled = false;
+                                updateStatusText.textContent = `تم تحميل وتثبيت التحديث ${latestVersion}.`;
+                            } catch (e) {
+                                console.error("Native update failed:", e);
+                                window.open(downloadUrl, '_blank');
+                                downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
+                                downloadUpdateBtn.disabled = false;
+                                updateStatusText.textContent = 'فشل التحميل التلقائي. تم فتح رابط التحميل في المتصفح.';
+                            }
+                        } else {
+                            window.open(downloadUrl, '_blank');
+                        }
                     };
                 }
                 
