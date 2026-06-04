@@ -131,7 +131,7 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
     hoursWidget.innerHTML = `
         <div class="metric-content">
             <div class="metric-label">الساعات المكتملة (Completed Hours)</div>
-            <div class="metric-value">144 / ${completedHours} </div>
+            <div class="metric-value" style="white-space:nowrap;font-size:clamp(1.4rem,5vw,2rem)">144 / ${completedHours} </div>
             <div class="metric-subtext">متبقي <strong>${Math.max(0, 144 - completedHours)}</strong> ساعة للتخرج</div>
         </div>
         <div class="metric-icon">
@@ -156,10 +156,65 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
             const section = document.createElement('div');
             section.className = 'term-section';
 
+            // --- Clean the term title: strip embedded [التقدير:X] / [Grade:X] / [GPA:X] ---
+            const cleanTitle = (term.title || '')
+                .replace(/\[(?:التقدير|Grade)\s*:[^\]]*\]/gi, '')
+                .replace(/\[\s*GPA\s*:[^\]]*\]/gi, '')
+                .trim();
+
+            // --- Calculate per-term GPA and completed hours ---
+            let termTotalPoints = 0;
+            let termGpaHours = 0;
+            let termCompletedHours = 0;
+
+            term.subjects.forEach(subject => {
+                const grade = (subject.grade || '').trim();
+                const hours = parseFloat(subject.hours) || 0;
+                if (hours <= 0) return;
+
+                const isFail = grade === 'راسب' || grade === 'F' || grade === 'E' || grade.toLowerCase() === 'fail';
+                const isAbsent = grade === 'غائب' || grade.toLowerCase() === 'absent';
+                const isPassed = !isFail && !isAbsent && grade !== '';
+
+                if (isPassed) termCompletedHours += hours;
+
+                // For GPA: skip pass/fail subjects (ناجح) and summer training
+                const isPassFail = grade === 'ناجح' || grade.toLowerCase() === 'pass';
+                const isSummerTraining = (subject.name || '').includes('التدريب الصيفي') || (subject.name || '').toLowerCase().includes('summer training');
+                if (isPassFail || isSummerTraining) return;
+
+                let points = parseFloat(subject.points);
+                if (isNaN(points)) {
+                    const derived = getPointsFromGrade(grade);
+                    if (derived !== null) points = derived;
+                }
+                if (isNaN(points)) return;
+
+                termTotalPoints += points * hours;
+                termGpaHours += hours;
+            });
+
+            const termGPA = termGpaHours > 0 ? (termTotalPoints / termGpaHours).toFixed(3) : null;
+
+            // --- Build term header with optional badges ---
+            let badgesHtml = '';
+            if (termGPA !== null || termCompletedHours > 0) {
+                const gpaBadge = termGPA !== null
+                    ? `<span class="term-badge">GPA: ${termGPA}</span>`
+                    : '';
+                const hoursBadge = termCompletedHours > 0
+                    ? `<span class="term-badge">${termCompletedHours} hr</span>`
+                    : '';
+                badgesHtml = `<div class="term-badges">${gpaBadge}${hoursBadge}</div>`;
+            }
+
             const header = document.createElement('div');
             header.className = 'term-header';
             header.innerHTML = `
-                <h2>${term.title}</h2>
+                <div class="term-header-content">
+                    <h2>${cleanTitle}</h2>
+                    ${badgesHtml}
+                </div>
                 <svg class="term-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="6 9 12 15 18 9"></polyline>
                 </svg>

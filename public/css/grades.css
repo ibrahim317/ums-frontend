@@ -32,6 +32,29 @@
     color: var(--text-primary);
 }
 
+.term-header-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+}
+
+.term-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.term-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background: var(--bg-secondary, #F3F4F6);
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
+
 .term-icon {
     transition: transform 0.2s ease;
     color: var(--text-secondary);
