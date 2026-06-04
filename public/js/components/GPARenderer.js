@@ -131,8 +131,8 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
     hoursWidget.innerHTML = `
         <div class="metric-content">
             <div class="metric-label">الساعات المكتملة (Completed Hours)</div>
-            <div class="metric-value" style="white-space:nowrap;font-size:clamp(1.4rem,5vw,2rem)">144 / ${completedHours} </div>
-            <div class="metric-subtext">متبقي <strong>${Math.max(0, 144 - completedHours)}</strong> ساعة للتخرج</div>
+            <div class="metric-value" style="white-space:nowrap;font-size:clamp(1.4rem,5vw,2rem)">140 / ${completedHours} </div>
+            <div class="metric-subtext">متبقي <strong>${Math.max(0, 140 - completedHours)}</strong> ساعة للتخرج</div>
         </div>
         <div class="metric-icon">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
