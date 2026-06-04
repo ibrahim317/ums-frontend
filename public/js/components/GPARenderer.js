@@ -1,3 +1,5 @@
+import { CompletedHoursCalculator } from '../utils/CompletedHoursCalculator.js';
+
 export const getPointsFromGrade = (gradeStr) => {
     if (!gradeStr) return null;
     const g = gradeStr.trim().toUpperCase();
@@ -68,10 +70,10 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
                 const name = subject.name || "";
                 const pointsStr = subject.points || "";
                 const hoursStr = subject.hours || "0";
-                
+
                 // Exclude rules based on user request
                 if (name.includes("التدريب الصيفي")) return;
-                
+
                 let points = parseFloat(pointsStr);
                 if (isNaN(points)) {
                     const derived = getPointsFromGrade(subject.grade);
@@ -79,17 +81,17 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
                         points = derived;
                     }
                 }
-                
+
                 if (isNaN(points)) return;
-                
+
                 const hours = parseFloat(hoursStr);
                 if (isNaN(hours)) return;
-                
+
                 const cleanName = cleanSubjectName(name);
                 const currentEntry = latestSubjects.get(cleanName);
-                const isLater = !currentEntry || 
-                                yearStart > currentEntry.yearStart || 
-                                (yearStart === currentEntry.yearStart && termRank > currentEntry.termRank);
+                const isLater = !currentEntry ||
+                    yearStart > currentEntry.yearStart ||
+                    (yearStart === currentEntry.yearStart && termRank > currentEntry.termRank);
 
                 if (isLater) {
                     latestSubjects.set(cleanName, { points, hours, yearStart, termRank });
@@ -111,9 +113,8 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
     gpaWidget.className = 'gpa-metric-card';
     gpaWidget.innerHTML = `
         <div class="metric-content">
-            <div class="metric-label">المعدل التراكمي العام (Overall GPA)</div>
+            <div class="metric-label">المعدل التراكمي العام (Cumulative GPA)</div>
             <div class="metric-value">${overallGPA}</div>
-            <div class="metric-subtext">مجموع الساعات المحتسبة: <strong>${totalHours}</strong> ساعة</div>
         </div>
         <div class="metric-icon">
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -123,10 +124,29 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
     `;
     container.appendChild(gpaWidget);
 
+    // --- Completed Hours Widget (separate from CGPA) ---
+    const { completedHours } = CompletedHoursCalculator.calculate(data);
+    const hoursWidget = document.createElement('div');
+    hoursWidget.className = 'gpa-metric-card';
+    hoursWidget.innerHTML = `
+        <div class="metric-content">
+            <div class="metric-label">الساعات المكتملة (Completed Hours)</div>
+            <div class="metric-value">${completedHours}</div>
+            <div class="metric-subtext">عدد الساعات التي تم اجتيازها بنجاح</div>
+        </div>
+        <div class="metric-icon">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+        </div>
+    `;
+    container.appendChild(hoursWidget);
+
     data.years.forEach(year => {
         const yearCard = document.createElement('div');
         yearCard.className = 'academic-year-card';
-        
+
         const yearTitle = document.createElement('div');
         yearTitle.className = 'academic-year-title';
         yearTitle.textContent = year.year;
@@ -153,7 +173,7 @@ export const renderGPA = (containerId, data, onSubjectOpen) => {
                 card.className = 'subject-card';
 
                 const openBtn = onSubjectOpen ? `<button class="subject-open-btn" data-subject="${subject.name}">فتح</button>` : '';
-                
+
                 let displayedPoints = subject.points;
                 if (!displayedPoints || displayedPoints === "لا يوجد" || isNaN(parseFloat(displayedPoints))) {
                     const derived = getPointsFromGrade(subject.grade);
