@@ -1,4 +1,4 @@
-import { getPointsFromGrade } from '../components/GPARenderer.js';
+import { getPointsFromGrade } from '../utils/CGPACalculator.js';
 import { TextNormalizer } from '../utils/TextNormalizer.js';
 import { appState } from '../services/AppState.js';
 

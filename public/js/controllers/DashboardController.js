@@ -1,4 +1,4 @@
-import { fetchAcademicYears, fetchYearWorkGrades, fetchGPA } from '../api.js';
+import { fetchAcademicYears, fetchYearWorkGrades, fetchGPA, fetchCurrentCourses, fetchMyAccountInfo } from '../api.js';
 import { appState } from '../services/AppState.js';
 import { renderYearWorkGrades } from '../components/YearWorkRenderer.js';
 import { renderGPA } from '../components/GPARenderer.js';
@@ -25,6 +25,7 @@ export class DashboardController {
         this.yearWorkTab = document.getElementById('year-work-tab');
         this.gpaTab = document.getElementById('gpa-tab');
         this.predictorTab = document.getElementById('predictor-tab');
+        this.analyticsTab = document.getElementById('analytics-tab');
         this.settingsTab = document.getElementById('settings-tab');
         this.appWebVersionSpan = document.getElementById('app-web-version');
         this.pageTitle = document.getElementById('page-title');
@@ -32,6 +33,7 @@ export class DashboardController {
         this.yearWorkTabBtn = document.querySelector('[data-target="year-work-tab"]');
         this.gpaTabBtn = document.querySelector('[data-target="gpa-tab"]');
         this.predictorTabBtn = document.querySelector('[data-target="predictor-tab"]');
+        this.analyticsTabBtn = document.querySelector('[data-target="analytics-tab"]');
         this.settingsTabBtn = document.querySelector('[data-target="settings-tab"]');
 
         this.fetchedVersion = null;
@@ -44,6 +46,7 @@ export class DashboardController {
         if (this.yearWorkTabBtn) this.yearWorkTabBtn.addEventListener('click', () => this.switchTab('year-work-tab'));
         if (this.gpaTabBtn) this.gpaTabBtn.addEventListener('click', () => this.switchTab('gpa-tab'));
         if (this.predictorTabBtn) this.predictorTabBtn.addEventListener('click', () => this.switchTab('predictor-tab'));
+        if (this.analyticsTabBtn) this.analyticsTabBtn.addEventListener('click', () => this.switchTab('analytics-tab'));
         if (this.settingsTabBtn) this.settingsTabBtn.addEventListener('click', () => this.switchTab('settings-tab'));
 
         if (this.yearSelect) {
@@ -106,6 +109,7 @@ export class DashboardController {
         if (this.errorContainer) this.errorContainer.classList.add('hidden');
         if (this.yearWorkTab) this.yearWorkTab.classList.add('hidden');
         if (this.gpaTab) this.gpaTab.classList.add('hidden');
+        if (this.analyticsTab) this.analyticsTab.classList.add('hidden');
     }
 
     /**
@@ -185,6 +189,18 @@ export class DashboardController {
                     console.warn(`Background year work prefetch failed for ${year.Text}:`, err);
                 }
             }
+        }
+
+        // 3. Prefetch current courses
+        try {
+            const response = await fetchCurrentCourses(false);
+            const data = await response.json();
+            if (data.success) {
+                appState.cachedCurrentCourses = data.data;
+                appState.currentCoursesCacheTime = data.updatedAt;
+            }
+        } catch (err) {
+            console.warn('Background current courses prefetch failed:', err);
         }
 
         this.checkAndUnlockSearch();
@@ -267,8 +283,8 @@ export class DashboardController {
      * Loads predictive semester grades calculations.
      */
     async loadPredictorData(force = false) {
-        if (appState.currentYearWorkGrades && !force) {
-            renderPredictor('predictor-container', appState.currentYearWorkGrades);
+        if (appState.currentYearWorkGrades && appState.cachedCurrentCourses && !force) {
+            renderPredictor('predictor-container', appState.currentYearWorkGrades, appState.cachedCurrentCourses);
             this.updateNavCacheInfo(appState.currentYearWorkCacheTime, () => this.loadPredictorData(true));
             if (this.predictorTab) this.predictorTab.classList.remove('hidden');
             return;
@@ -281,16 +297,29 @@ export class DashboardController {
             navRevalidateBtn.disabled = true;
         }
         try {
+            // Fetch Year Work
             const response = await fetchYearWorkGrades('', force);
             const data = await response.json();
 
-            if (data.success) {
+            // Fetch Current Courses
+            const coursesRes = await fetchCurrentCourses(force);
+            const coursesData = await coursesRes.json();
+
+            // Fetch GPA (needed for calculations)
+            if (!appState.cachedGPAData) {
+                await this.loadGPA(force);
+            }
+
+            if (data.success && coursesData.success) {
                 appState.currentYearWorkGrades = data.data;
                 appState.currentYearWorkCacheTime = data.updatedAt;
 
+                appState.cachedCurrentCourses = coursesData.data;
+                appState.currentCoursesCacheTime = coursesData.updatedAt;
+
                 appState.cachedYearWorkData.set('', { data: data.data, updatedAt: data.updatedAt });
 
-                renderPredictor('predictor-container', appState.currentYearWorkGrades);
+                renderPredictor('predictor-container', appState.currentYearWorkGrades, appState.cachedCurrentCourses);
 
                 if (this.yearSelect && !this.yearSelect.value) {
                     renderYearWorkGrades(
@@ -316,12 +345,80 @@ export class DashboardController {
                 this.hideLoader();
                 if (this.predictorTab) this.predictorTab.classList.remove('hidden');
             } else {
-                if (response.status === 401 || response.status === 403) {
+                if (response.status === 401 || response.status === 403 || coursesRes.status === 401 || coursesRes.status === 403) {
                     if (this.logoutCallback) this.logoutCallback();
                 } else {
-                    throw new Error(data.error);
+                    throw new Error(data.error || coursesData.error);
                 }
             }
+        } finally {
+            if (navRevalidateBtn) {
+                navRevalidateBtn.classList.remove('spinning');
+                navRevalidateBtn.disabled = false;
+            }
+        }
+    }
+
+    /**
+     * Loads the Analytics data.
+     */
+    async loadAnalyticsData(force = false) {
+        if (appState.cachedGPAData && appState.cachedMyAccount && !force) {
+            import('../components/AnalyticsRenderer.js').then(module => {
+                module.renderAnalytics('analytics-container', appState.cachedGPAData, appState.cachedMyAccount);
+            });
+            this.updateNavCacheInfo(appState.myAccountCacheTime, () => this.loadAnalyticsData(true));
+            if (this.analyticsTab) this.analyticsTab.classList.remove('hidden');
+            return;
+        }
+
+        this.showLoader();
+        const navRevalidateBtn = document.getElementById('nav-revalidate-btn');
+        if (force && navRevalidateBtn) {
+            navRevalidateBtn.classList.add('spinning');
+            navRevalidateBtn.disabled = true;
+        }
+
+        try {
+            // Ensure GPA is loaded since analytics heavily rely on it
+            if (!appState.cachedGPAData || force) {
+                await this.loadGPA(force);
+            }
+
+            // Fetch My Account Info
+            const accountRes = await fetchMyAccountInfo(force);
+            const accountData = await accountRes.json();
+
+            if (accountData.success) {
+                appState.cachedMyAccount = accountData.data;
+                appState.myAccountCacheTime = accountData.updatedAt;
+
+                import('../components/AnalyticsRenderer.js').then(module => {
+                    module.renderAnalytics('analytics-container', appState.cachedGPAData, appState.cachedMyAccount);
+                });
+
+                const activeLink = document.querySelector('.sidebar-link.active');
+                const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
+                if (activeTargetId === 'analytics-tab') {
+                    this.updateNavCacheInfo(appState.myAccountCacheTime, () => this.loadAnalyticsData(true));
+                }
+
+                this.hideLoader();
+                if (this.analyticsTab) this.analyticsTab.classList.remove('hidden');
+            } else {
+                if (accountRes.status === 401 || accountRes.status === 403) {
+                    if (this.logoutCallback) this.logoutCallback();
+                } else {
+                    throw new Error(accountData.error);
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load analytics data:', error);
+            const container = document.getElementById('analytics-container');
+            if (container) {
+                container.innerHTML = `<div class="error-state">حدث خطأ أثناء تحميل البيانات: ${error.message}</div>`;
+            }
+            this.hideLoader();
         } finally {
             if (navRevalidateBtn) {
                 navRevalidateBtn.classList.remove('spinning');
@@ -346,7 +443,9 @@ export class DashboardController {
             if (yearId === '') {
                 appState.currentYearWorkGrades = cached.data;
                 appState.currentYearWorkCacheTime = cached.updatedAt;
-                renderPredictor('predictor-container', appState.currentYearWorkGrades);
+                if (appState.cachedCurrentCourses) {
+                    renderPredictor('predictor-container', appState.currentYearWorkGrades, appState.cachedCurrentCourses);
+                }
 
                 let ywYearLabel = '';
                 if (appState.cachedAcademicYears) {
@@ -390,7 +489,9 @@ export class DashboardController {
                 if (yearId === '') {
                     appState.currentYearWorkGrades = data.data;
                     appState.currentYearWorkCacheTime = data.updatedAt;
-                    renderPredictor('predictor-container', appState.currentYearWorkGrades);
+                    if (appState.cachedCurrentCourses) {
+                        renderPredictor('predictor-container', appState.currentYearWorkGrades, appState.cachedCurrentCourses);
+                    }
                 }
 
                 let ywYearLabel = '';
@@ -560,6 +661,7 @@ export class DashboardController {
         if (this.yearWorkTab) this.yearWorkTab.classList.add('hidden');
         if (this.gpaTab) this.gpaTab.classList.add('hidden');
         if (this.predictorTab) this.predictorTab.classList.add('hidden');
+        if (this.analyticsTab) this.analyticsTab.classList.add('hidden');
         if (this.settingsTab) this.settingsTab.classList.add('hidden');
 
         if (targetId === 'year-work-tab') {
@@ -580,6 +682,8 @@ export class DashboardController {
             }
         } else if (targetId === 'predictor-tab') {
             await this.loadPredictorData();
+        } else if (targetId === 'analytics-tab') {
+            await this.loadAnalyticsData();
         } else if (targetId === 'settings-tab') {
             this.hideNavCacheInfo();
             await this.loadSettings();

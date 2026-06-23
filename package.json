@@ -37,5 +37,8 @@
     "form-data": "^4.0.5",
     "jsonwebtoken": "^9.0.3",
     "node-cache": "^5.1.2"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
   }
 }

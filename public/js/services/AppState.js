@@ -26,6 +26,12 @@ export class AppState {
         this.searchIndex = [];
         this.yearWorkEntries = []; // Array of { yearLabel, data }
         this.currentYearWorkLabel = '';
+
+        this.cachedCurrentCourses = null;
+        this.currentCoursesCacheTime = null;
+
+        this.cachedMyAccount = null;
+        this.myAccountCacheTime = null;
     }
 }
 

@@ -128,3 +128,54 @@ export const fetchGPA = async (force = false) => {
         return await fetch(url, { headers: getBrowserHeaders() });
     }
 };
+
+/**
+ * Fetches current semester courses.
+ */
+export const fetchCurrentCourses = async (force = false) => {
+    if (isCapacitor) {
+        try {
+            const result = await umsService.getCurrentCourses(force);
+            return createFetchLikeResponse(200, true, result.data, null, result.updatedAt);
+        } catch (error) {
+            console.error('API Fetch Current Courses Error:', error);
+            const errMsg = error?.message || (typeof error === 'string' ? error : '') || 'فشل في جلب المقررات الحالية.';
+            const isAuthError = errMsg.includes('credentials not found') || errMsg.includes('again');
+            return createFetchLikeResponse(
+                isAuthError ? 401 : 500,
+                false,
+                null,
+                errMsg
+            );
+        }
+    } else {
+        // Desktop binary (.exe/.elf) fallback
+        const url = `/api/grades/current-courses${force ? '?force=true' : ''}`;
+        return await fetch(url, { headers: getBrowserHeaders() });
+    }
+};
+
+/**
+ * Fetches my account info.
+ */
+export const fetchMyAccountInfo = async (force = false) => {
+    if (isCapacitor) {
+        try {
+            const result = await umsService.getMyAccountInfo(force);
+            return createFetchLikeResponse(200, true, result.data, null, result.updatedAt);
+        } catch (error) {
+            console.error('API Fetch My Account Error:', error);
+            const errMsg = error?.message || (typeof error === 'string' ? error : '') || 'فشل في جلب بيانات الحساب.';
+            const isAuthError = errMsg.includes('credentials not found') || errMsg.includes('again');
+            return createFetchLikeResponse(
+                isAuthError ? 401 : 500,
+                false,
+                null,
+                errMsg
+            );
+        }
+    } else {
+        const url = `/api/grades/my-account${force ? '?force=true' : ''}`;
+        return await fetch(url, { headers: getBrowserHeaders() });
+    }
+};

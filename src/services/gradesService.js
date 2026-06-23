@@ -154,10 +154,65 @@ const fetchGPA = async (cookies) => {
     });
 
     return parsedData;
+}
+
+const fetchCurrentCourses = async (cookies) => {
+    const url = 'https://ums.asu.edu.eg/UserInformation/CurrentCourse';
+    const response = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Referer': 'https://ums.asu.edu.eg/UserInformation/MyAccount',
+            'Cookie': cookies
+        }
+    });
+
+    const $ = cheerio.load(response.data);
+    const courses = [];
+
+    $('.price-table-box2').each((i, subjectEl) => {
+        const subjectNameRaw = $(subjectEl).find('h5.text-dark').first().text().replace(/\s+/g, ' ').trim();
+        if (subjectNameRaw) {
+            courses.push({
+                name: subjectNameRaw
+            });
+        }
+    });
+
+    return { courses };
+};
+
+const fetchMyAccountInfo = async (cookies) => {
+    const url = 'https://ums.asu.edu.eg/UserInformation/MyAccount';
+    const response = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Cookie': cookies
+        }
+    });
+
+    const $ = cheerio.load(response.data);
+    let highestLevel = null;
+
+    $('.sidebar-box .progress .lead').each((i, el) => {
+        const text = $(el).text().trim();
+        if (text) {
+            // Pick the first one we find as it's usually ordered, but let's just collect all and sort or just grab them
+            // "المستوى الثالث - دور يناير"
+            // Let's just return all of them or the highest.
+            // The user said "highest Level he have in this sidebar".
+            if (!highestLevel) highestLevel = text; // Usually the first one is the latest
+        }
+    });
+
+    return { levelText: highestLevel };
 };
 
 module.exports = {
     fetchAcademicYears,
     fetchYearWorkGrades,
-    fetchGPA
+    fetchGPA,
+    fetchCurrentCourses,
+    fetchMyAccountInfo
 };

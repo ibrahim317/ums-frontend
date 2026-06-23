@@ -228,6 +228,90 @@ app.get('/api/grades/gpa', authenticateToken, async (req, res) => {
     }
 });
 
+// --- CURRENT COURSES ENDPOINT ---
+app.get('/api/grades/current-courses', authenticateToken, async (req, res) => {
+    const username = req.user.username;
+    const lang = req.headers['x-culture'] || 'ar';
+    const cacheKey = `${username}_currentcourses_${lang}`;
+
+    try {
+        const force = req.query.force === 'true';
+
+        if (!force) {
+            let cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
+
+            if (cacheRecord) {
+                const updatedAt = new Date(cacheRecord.updated_at + 'Z');
+                const diffSeconds = (new Date() - updatedAt) / 1000;
+
+                if (diffSeconds < 60 * 60) { // 1 hour
+                    console.log(`Serving cached current courses for ${cacheKey}`);
+                    return res.json({ success: true, data: JSON.parse(cacheRecord.data), cached: true, updatedAt: cacheRecord.updated_at });
+                }
+            }
+        }
+
+        console.log(`Cache miss for ${cacheKey}. Scraping from UMS...`);
+        const cookies = await getValidCookies(username);
+        const culturedCookies = getCulturedCookies(cookies, lang);
+        const coursesData = await gradesService.fetchCurrentCourses(culturedCookies);
+
+        db.prepare(`
+            INSERT INTO cache (cache_key, username, data, updated_at) 
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(cache_key) DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+        `).run(cacheKey, username, JSON.stringify(coursesData));
+
+        const updatedRecord = db.prepare('SELECT updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
+
+        res.json({ success: true, data: coursesData, cached: false, updatedAt: updatedRecord.updated_at });
+    } catch (error) {
+        console.error(`Error fetching current courses for ${username}:`, error.message);
+        res.status(500).json({ success: false, error: error.message || 'Failed to retrieve current courses.' });
+    }
+});
+
+// --- MY ACCOUNT ENDPOINT ---
+app.get('/api/grades/my-account', authenticateToken, async (req, res) => {
+    const username = req.user.username;
+    const lang = req.headers['x-culture'] || 'ar';
+    const cacheKey = `${username}_myaccount_${lang}`;
+
+    try {
+        const force = req.query.force === 'true';
+
+        if (!force) {
+            let cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
+
+            if (cacheRecord) {
+                const updatedAt = new Date(cacheRecord.updated_at + 'Z');
+                const diffSeconds = (new Date() - updatedAt) / 1000;
+
+                if (diffSeconds < 24 * 60 * 60) { // 24 hours
+                    return res.json({ success: true, data: JSON.parse(cacheRecord.data), cached: true, updatedAt: cacheRecord.updated_at });
+                }
+            }
+        }
+
+        const cookies = await getValidCookies(username);
+        const culturedCookies = getCulturedCookies(cookies, lang);
+        const accountData = await gradesService.fetchMyAccountInfo(culturedCookies);
+
+        db.prepare(`
+            INSERT INTO cache (cache_key, username, data, updated_at) 
+            VALUES (?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(cache_key) DO UPDATE SET data = excluded.data, updated_at = CURRENT_TIMESTAMP
+        `).run(cacheKey, username, JSON.stringify(accountData));
+
+        const updatedRecord = db.prepare('SELECT updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
+
+        res.json({ success: true, data: accountData, cached: false, updatedAt: updatedRecord.updated_at });
+    } catch (error) {
+        console.error(`Error fetching my account for ${username}:`, error.message);
+        res.status(500).json({ success: false, error: error.message || 'Failed to retrieve account info.' });
+    }
+});
+
 // --- VERSION ENDPOINT ---
 app.get('/api/version', (req, res) => {
     try {

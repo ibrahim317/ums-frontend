@@ -143,6 +143,50 @@ export class UmsParser {
         return parsedData;
     }
 
+    /**
+     * Parses the current courses page.
+     * @param {string} htmlText 
+     * @returns {Object} Structured current courses
+     */
+    parseCurrentCourses(htmlText) {
+        const doc = this._getDoc(htmlText);
+        const courses = [];
+
+        const subjectEls = doc.querySelectorAll('.price-table-box2');
+        subjectEls.forEach((subjectEl) => {
+            const h5 = subjectEl.querySelector('h5.text-dark');
+            if (!h5) return;
+            const subjectNameRaw = h5.textContent.replace(/\s+/g, ' ').trim();
+            if (subjectNameRaw) {
+                courses.push({
+                    name: subjectNameRaw
+                });
+            }
+        });
+
+        return { courses };
+    }
+
+    /**
+     * Parses the My Account page.
+     * @param {string} htmlText 
+     * @returns {Object} Structured account info
+     */
+    parseMyAccountInfo(htmlText) {
+        const doc = this._getDoc(htmlText);
+        let highestLevel = null;
+
+        const progressEls = doc.querySelectorAll('.sidebar-box .progress .lead');
+        progressEls.forEach((el) => {
+            const text = el.textContent.replace(/\s+/g, ' ').trim();
+            if (text && !highestLevel) {
+                highestLevel = text;
+            }
+        });
+
+        return { levelText: highestLevel };
+    }
+
     _getDoc(htmlText) {
         const parser = new DOMParser();
         return parser.parseFromString(htmlText, 'text/html');

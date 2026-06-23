@@ -295,4 +295,67 @@ export class UmsService {
 
         return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
     }
+
+    /**
+     * Fetches current semester courses.
+     * Cache TTL: 1 hour.
+     */
+    async getCurrentCourses(force = false) {
+        const cacheKey = this._cacheKey('cache_current_courses');
+        if (!force) {
+            const cached = this.storage.getCache(cacheKey, 1 * 60 * 60 * 1000);
+            if (cached) {
+                return { success: true, data: cached.data, cached: true, updatedAt: cached.updatedAt };
+            }
+        }
+
+        const cookies = await this.getValidCookies();
+        const response = await this.http.request({
+            url: 'https://ums.asu.edu.eg/UserInformation/CurrentCourse',
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Referer': 'https://ums.asu.edu.eg/UserInformation/MyAccount',
+                'Cookie': this._withCulture(cookies)
+            }
+        });
+
+        const htmlText = await response.text();
+        const parsed = this.parser.parseCurrentCourses(htmlText);
+        this.storage.setCache(cacheKey, parsed);
+
+        return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
+    }
+
+    /**
+     * Fetches My Account info.
+     * Cache TTL: 24 hours.
+     */
+    async getMyAccountInfo(force = false) {
+        const cacheKey = this._cacheKey('cache_my_account');
+        if (!force) {
+            const cached = this.storage.getCache(cacheKey, 24 * 60 * 60 * 1000);
+            if (cached) {
+                return { success: true, data: cached.data, cached: true, updatedAt: cached.updatedAt };
+            }
+        }
+
+        const cookies = await this.getValidCookies();
+        const response = await this.http.request({
+            url: 'https://ums.asu.edu.eg/UserInformation/MyAccount',
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Cookie': this._withCulture(cookies)
+            }
+        });
+
+        const htmlText = await response.text();
+        const parsed = this.parser.parseMyAccountInfo(htmlText);
+        this.storage.setCache(cacheKey, parsed);
+
+        return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
+    }
 }

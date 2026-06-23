@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="css/components.css">
     <link rel="stylesheet" href="css/grades.css">
     <link rel="stylesheet" href="css/search.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
@@ -124,6 +125,14 @@
                         </svg>
                         GPA
                     </button>
+                    <button class="sidebar-link" data-target="analytics-tab" data-title="تحليلات أكاديمية">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="18" y1="20" x2="18" y2="10"></line>
+                            <line x1="12" y1="20" x2="12" y2="4"></line>
+                            <line x1="6" y1="20" x2="6" y2="14"></line>
+                        </svg>
+                        تحليلات
+                    </button>
                     <button class="sidebar-link" data-target="settings-tab" data-title="الإعدادات">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -204,6 +213,11 @@
                     <!-- TAB CONTENT: GPA -->
                     <div id="gpa-tab" class="tab-content hidden">
                         <div id="gpa-container" class="grades-container"></div>
+                    </div>
+
+                    <!-- TAB CONTENT: ANALYTICS -->
+                    <div id="analytics-tab" class="tab-content hidden">
+                        <div id="analytics-container" class="grades-container"></div>
                     </div>
 
                     <!-- TAB CONTENT: SETTINGS -->
