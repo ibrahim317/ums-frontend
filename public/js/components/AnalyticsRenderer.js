@@ -97,6 +97,9 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
         });
     });
 
+    termLabels.reverse();
+    termGpas.reverse();
+
     // 2. Build UI HTML
     const wrapper = document.createElement('div');
     wrapper.style.display = 'flex';
