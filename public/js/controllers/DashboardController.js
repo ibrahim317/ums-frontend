@@ -330,10 +330,15 @@ export class DashboardController {
      * Loads predictive semester grades calculations.
      */
     async loadPredictorData(force = false) {
+        const activeLink = document.querySelector('.sidebar-link.active');
+        const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
+
         if (appState.currentYearWorkGrades && appState.cachedCurrentCourses && !force) {
             renderPredictor('predictor-container', appState.currentYearWorkGrades, appState.cachedCurrentCourses);
             this.updateNavCacheInfo(appState.currentYearWorkCacheTime, () => this.loadPredictorData(true));
-            if (this.predictorTab) this.predictorTab.classList.remove('hidden');
+            if (activeTargetId === 'predictor-tab') {
+                if (this.predictorTab) this.predictorTab.classList.remove('hidden');
+            }
             return;
         }
 
@@ -383,14 +388,14 @@ export class DashboardController {
                     appState.currentYearWorkLabel = ywYearLabel;
                 }
 
-                const activeLink = document.querySelector('.sidebar-link.active');
-                const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
                 if (activeTargetId === 'predictor-tab') {
                     this.updateNavCacheInfo(appState.currentYearWorkCacheTime, () => this.loadPredictorData(true));
                 }
 
                 this.hideLoader();
-                if (this.predictorTab) this.predictorTab.classList.remove('hidden');
+                if (activeTargetId === 'predictor-tab') {
+                    if (this.predictorTab) this.predictorTab.classList.remove('hidden');
+                }
             } else {
                 if (response.status === 401 || response.status === 403 || coursesRes.status === 401 || coursesRes.status === 403) {
                     if (this.logoutCallback) this.logoutCallback();
@@ -410,12 +415,17 @@ export class DashboardController {
      * Loads the Analytics data.
      */
     async loadAnalyticsData(force = false) {
+        const activeLink = document.querySelector('.sidebar-link.active');
+        const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
+
         if (appState.cachedGPAData && appState.cachedMyAccount && !force) {
             import('../components/AnalyticsRenderer.js').then(module => {
                 module.renderAnalytics('analytics-container', appState.cachedGPAData, appState.cachedMyAccount);
             });
             this.updateNavCacheInfo(appState.myAccountCacheTime, () => this.loadAnalyticsData(true));
-            if (this.analyticsTab) this.analyticsTab.classList.remove('hidden');
+            if (activeTargetId === 'analytics-tab') {
+                if (this.analyticsTab) this.analyticsTab.classList.remove('hidden');
+            }
             return;
         }
 
@@ -444,14 +454,14 @@ export class DashboardController {
                     module.renderAnalytics('analytics-container', appState.cachedGPAData, appState.cachedMyAccount);
                 });
 
-                const activeLink = document.querySelector('.sidebar-link.active');
-                const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
                 if (activeTargetId === 'analytics-tab') {
                     this.updateNavCacheInfo(appState.myAccountCacheTime, () => this.loadAnalyticsData(true));
                 }
 
                 this.hideLoader();
-                if (this.analyticsTab) this.analyticsTab.classList.remove('hidden');
+                if (activeTargetId === 'analytics-tab') {
+                    if (this.analyticsTab) this.analyticsTab.classList.remove('hidden');
+                }
             } else {
                 if (accountRes.status === 401 || accountRes.status === 403) {
                     if (this.logoutCallback) this.logoutCallback();
@@ -478,6 +488,9 @@ export class DashboardController {
      * Loads year-work grades structure for UI.
      */
     async loadYearWorkGrades(yearId, force = false) {
+        const activeLink = document.querySelector('.sidebar-link.active');
+        const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
+
         if (appState.cachedYearWorkData.has(yearId) && !force) {
             const cached = appState.cachedYearWorkData.get(yearId);
             renderYearWorkGrades(
@@ -505,12 +518,10 @@ export class DashboardController {
                 appState.currentYearWorkLabel = ywYearLabel;
             }
 
-            const activeLink = document.querySelector('.sidebar-link.active');
-            const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
             if (activeTargetId === 'year-work-tab') {
                 this.updateNavCacheInfo(appState.yearWorkCacheTime, () => this.loadYearWorkGrades(yearId, true));
+                if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
             }
-            if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
             return;
         }
 
@@ -557,15 +568,15 @@ export class DashboardController {
                 }
 
                 appState.yearWorkCacheTime = data.updatedAt;
-                const activeLink = document.querySelector('.sidebar-link.active');
-                const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
                 if (activeTargetId === 'year-work-tab') {
                     this.updateNavCacheInfo(appState.yearWorkCacheTime, () => this.loadYearWorkGrades(yearId, true));
                 }
 
                 this.checkAndUnlockSearch();
                 this.hideLoader();
-                if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
+                if (activeTargetId === 'year-work-tab') {
+                    if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
+                }
             } else {
                 if (response.status === 401 || response.status === 403) {
                     if (this.logoutCallback) this.logoutCallback();
@@ -585,6 +596,9 @@ export class DashboardController {
      * Loads student total Cumulative GPA scores.
      */
     async loadGPA(force = false) {
+        const activeLink = document.querySelector('.sidebar-link.active');
+        const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
+
         if (appState.cachedGPAData && !force) {
             renderGPA(
                 'gpa-container',
@@ -593,7 +607,9 @@ export class DashboardController {
             );
             this.searchService.setGPAData(appState.cachedGPAData);
             this.updateNavCacheInfo(appState.gpaCacheTime, () => this.loadGPA(true));
-            if (this.gpaTab) this.gpaTab.classList.remove('hidden');
+            if (activeTargetId === 'gpa-tab') {
+                if (this.gpaTab) this.gpaTab.classList.remove('hidden');
+            }
             return;
         }
 
@@ -616,14 +632,14 @@ export class DashboardController {
                 );
                 this.searchService.setGPAData(data.data);
                 appState.gpaCacheTime = data.updatedAt;
-                const activeLink = document.querySelector('.sidebar-link.active');
-                const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
                 if (activeTargetId === 'gpa-tab') {
                     this.updateNavCacheInfo(appState.gpaCacheTime, () => this.loadGPA(true));
                 }
                 this.checkAndUnlockSearch();
                 this.hideLoader();
-                if (this.gpaTab) this.gpaTab.classList.remove('hidden');
+                if (activeTargetId === 'gpa-tab') {
+                    if (this.gpaTab) this.gpaTab.classList.remove('hidden');
+                }
             } else {
                 if (response.status === 401 || response.status === 403) {
                     if (this.logoutCallback) this.logoutCallback();
