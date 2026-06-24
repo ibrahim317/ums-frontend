@@ -40,6 +40,28 @@ export class AuthController {
         if (this.logoutNavBtn) {
             this.logoutNavBtn.addEventListener('click', () => this.requestLogout());
         }
+
+        // Toggle password visibility
+        const togglePasswordBtn = document.getElementById('toggle-password-btn');
+        const passwordInput = document.getElementById('password');
+        if (togglePasswordBtn && passwordInput) {
+            togglePasswordBtn.addEventListener('click', () => {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+
+                const eyeIcon = document.getElementById('eye-icon');
+                const eyeOffIcon = document.getElementById('eye-off-icon');
+                if (eyeIcon && eyeOffIcon) {
+                    if (type === 'password') {
+                        eyeIcon.classList.remove('hidden');
+                        eyeOffIcon.classList.add('hidden');
+                    } else {
+                        eyeIcon.classList.add('hidden');
+                        eyeOffIcon.classList.remove('hidden');
+                    }
+                }
+            });
+        }
     }
 
     /**

@@ -625,3 +625,37 @@ select:disabled {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
 }
+
+/* Password Visibility Toggle */
+.password-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.password-wrapper input {
+    padding-left: 40px !important; /* Space for the toggle button on the left */
+}
+
+.toggle-password-btn {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    border-radius: 50%;
+    transition: background-color 0.2s, color 0.2s;
+    outline: none;
+}
+
+.toggle-password-btn:hover {
+    background-color: var(--border-soft);
+    color: var(--text-primary);
+}
+
