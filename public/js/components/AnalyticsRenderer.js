@@ -164,7 +164,7 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
     // 3. Charts Section
     const chartsWrapper = document.createElement('div');
     chartsWrapper.style.display = 'grid';
-    chartsWrapper.style.gridTemplateColumns = 'repeat(auto-fit, minmax(350px, 1fr))';
+    chartsWrapper.style.gridTemplateColumns = 'repeat(auto-fit, minmax(280px, 1fr))';
     chartsWrapper.style.gap = '20px';
     chartsWrapper.style.marginTop = '10px';
 
@@ -174,7 +174,9 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
     trendCard.style.padding = '20px';
     trendCard.innerHTML = `
         <h3 style="margin-bottom: 15px;">منحنى المعدل الفصلي</h3>
-        <canvas id="gpaTrendChart"></canvas>
+        <div style="position: relative; height: 260px; width: 100%;">
+            <canvas id="gpaTrendChart"></canvas>
+        </div>
     `;
     chartsWrapper.appendChild(trendCard);
 
@@ -184,7 +186,9 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
     distCard.style.padding = '20px';
     distCard.innerHTML = `
         <h3 style="margin-bottom: 15px;">توزيع التقديرات المكتسبة</h3>
-        <canvas id="gradeDistChart"></canvas>
+        <div style="position: relative; height: 260px; width: 100%;">
+            <canvas id="gradeDistChart"></canvas>
+        </div>
     `;
     chartsWrapper.appendChild(distCard);
 
@@ -193,6 +197,12 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
 
     // 4. Initialize Chart.js
     if (window.Chart) {
+        const isDark = document.body.classList.contains('dark-mode');
+        const textColor = isDark ? '#9CA3AF' : '#6B7280';
+        const gridColor = isDark ? 'rgba(75, 85, 99, 0.3)' : '#E5E7EB';
+        const lineColor = isDark ? '#3B82F6' : '#002147';
+        const areaColor = isDark ? 'rgba(59, 130, 246, 0.15)' : 'rgba(0, 33, 71, 0.1)';
+
         // Line Chart
         const trendCtx = document.getElementById('gpaTrendChart').getContext('2d');
         new Chart(trendCtx, {
@@ -202,20 +212,42 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
                 datasets: [{
                     label: 'المعدل الفصلي',
                     data: termGpas,
-                    borderColor: '#002147',
-                    backgroundColor: 'rgba(0, 33, 71, 0.1)',
+                    borderColor: lineColor,
+                    backgroundColor: areaColor,
                     borderWidth: 2,
                     tension: 0.3,
                     fill: true,
                     pointBackgroundColor: '#c8a048',
-                    pointBorderColor: '#fff',
+                    pointBorderColor: isDark ? '#1F293D' : '#fff',
                     pointRadius: 5
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 scales: {
-                    y: { min: 0, max: 4 }
+                    x: {
+                        grid: {
+                            color: gridColor,
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: textColor,
+                            font: { family: 'Cairo', size: 10 }
+                        }
+                    },
+                    y: {
+                        min: 0,
+                        max: 4,
+                        grid: {
+                            color: gridColor,
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: textColor,
+                            font: { family: 'Cairo', size: 10 }
+                        }
+                    }
                 },
                 plugins: {
                     legend: { display: false }
@@ -223,16 +255,16 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
             }
         });
 
-        // Pie/Doughnut Chart
+        // Doughnut Chart
         const distCtx = document.getElementById('gradeDistChart').getContext('2d');
         const sortedGrades = Object.keys(gradeCounts).sort();
         const distData = sortedGrades.map(k => gradeCounts[k]);
         const colors = sortedGrades.map(g => {
-            if (g.startsWith('A')) return '#28a745'; // Green
-            if (g.startsWith('B')) return '#007bff'; // Blue
-            if (g.startsWith('C')) return '#ffc107'; // Yellow
-            if (g.startsWith('D')) return '#fd7e14'; // Orange
-            return '#dc3545'; // Red
+            if (g.startsWith('A')) return '#10B981'; // Emerald Green
+            if (g.startsWith('B')) return '#3B82F6'; // Blue
+            if (g.startsWith('C')) return '#F59E0B'; // Yellow/Amber
+            if (g.startsWith('D')) return '#F97316'; // Orange
+            return '#EF4444'; // Red
         });
 
         new Chart(distCtx, {
@@ -242,13 +274,23 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
                 datasets: [{
                     data: distData,
                     backgroundColor: colors,
-                    borderWidth: 1
+                    borderWidth: isDark ? 2 : 1,
+                    borderColor: isDark ? '#1F293D' : '#fff'
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'right' }
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: textColor,
+                            font: { family: 'Cairo', size: 10 },
+                            boxWidth: 10,
+                            padding: 8
+                        }
+                    }
                 }
             }
         });

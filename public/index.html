@@ -16,6 +16,14 @@
 </head>
 
 <body>
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('ums_theme');
+            if (savedTheme === 'dark' || (!savedTheme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.body.classList.add('dark-mode');
+            }
+        })();
+    </script>
     <main class="app-container">
 
         <!-- TOP NAVBAR -->
@@ -224,7 +232,7 @@
                     <div id="settings-tab" class="tab-content hidden">
                         <div class="term-section">
                             <div class="term-header">
-                                <h2>تفضيلات اللغة</h2>
+                                <h2>التفضيلات العامة</h2>
                             </div>
                             <div class="term-content" style="grid-template-columns: 1fr;">
                                 <div class="subject-card" style="box-shadow: none;">
@@ -234,6 +242,13 @@
                                             <select id="ums-culture-select" class="settings-select">
                                                 <option value="ar">العربية</option>
                                                 <option value="en">English</option>
+                                            </select>
+                                        </li>
+                                        <li style="align-items: center; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 8px;">
+                                            <span class="grade-label">مظهر التطبيق</span>
+                                            <select id="app-theme-select" class="settings-select">
+                                                <option value="light">مضيء (Light)</option>
+                                                <option value="dark">داكن (Dark)</option>
                                             </select>
                                         </li>
                                     </ul>

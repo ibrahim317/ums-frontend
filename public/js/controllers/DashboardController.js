@@ -625,6 +625,34 @@ export class DashboardController {
             }
         }
 
+        const themeSelect = document.getElementById('app-theme-select');
+        if (themeSelect) {
+            const savedTheme = localStorage.getItem('ums_theme') || (document.body.classList.contains('dark-mode') ? 'dark' : 'light');
+            themeSelect.value = savedTheme;
+
+            if (!themeSelect.dataset.listenerAdded) {
+                themeSelect.dataset.listenerAdded = 'true';
+                themeSelect.addEventListener('change', (e) => {
+                    const newTheme = e.target.value;
+                    localStorage.setItem('ums_theme', newTheme);
+                    if (newTheme === 'dark') {
+                        document.body.classList.add('dark-mode');
+                    } else {
+                        document.body.classList.remove('dark-mode');
+                    }
+
+                    // Re-render analytics dynamically if it is currently selected tab
+                    const activeLink = document.querySelector('.sidebar-link.active');
+                    const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
+                    if (activeTargetId === 'analytics-tab' && appState.cachedGPAData && appState.cachedMyAccount) {
+                        import('../components/AnalyticsRenderer.js').then(module => {
+                            module.renderAnalytics('analytics-container', appState.cachedGPAData, appState.cachedMyAccount);
+                        });
+                    }
+                });
+            }
+        }
+
         if (this.appWebVersionSpan) {
             this.appWebVersionSpan.textContent = appState.CURRENT_APP_VERSION;
         }

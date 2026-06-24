@@ -12,7 +12,7 @@
 
 .form-group input {
     width: 100%;
-    background: #FFFFFF;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 8px 12px;
@@ -108,7 +108,7 @@
 }
 
 .secondary-btn {
-    background: #FFFFFF;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 6px 12px;
@@ -156,11 +156,11 @@
 }
 
 .sidebar-link:hover {
-    background: #F3F4F6;
+    background: var(--border-soft);
 }
 
 .sidebar-link.active {
-    background: #F3F4F6;
+    background: var(--border-soft);
     font-weight: 700;
 }
 
@@ -209,7 +209,7 @@ select {
     width: 100%;
     padding: 6px 12px 6px 32px; /* left chevron */
     padding-right: 32px; /* right calendar */
-    background: #FFFFFF;
+    background: var(--card-bg);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
     border-radius: 4px;
@@ -230,7 +230,7 @@ select:focus {
 select:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background: #F9FAFB;
+    background: var(--border-soft);
 }
 
 /* Loader */

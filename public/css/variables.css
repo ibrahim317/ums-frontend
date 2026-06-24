@@ -12,3 +12,19 @@
     --banner-bg: #EFF6FF; /* Light blue for banners */
     --banner-text: #1D4ED8; /* Dark blue for banners */
 }
+
+body.dark-mode {
+    --bg-color: #0B0F19; /* Sleek dark slate background */
+    --panel-bg: #151D30; /* Premium panel dark background */
+    --sidebar-bg: #111827; /* Darker sidebar background */
+    --card-bg: #1F293D; /* Rich card background */
+    --text-primary: #F3F4F6; /* Premium light grey text */
+    --text-secondary: #9CA3AF; /* Medium light text */
+    --accent-color: #3B82F6; /* Vibrant material blue */
+    --accent-hover: #2563EB;
+    --border-color: #2D3748; /* Slate gray border */
+    --border-soft: #1E293B; /* Softer border/divider */
+    --banner-bg: #1E3A8A; /* Rich blue banner background */
+    --banner-text: #93C5FD; /* Bright light blue text */
+}
+
