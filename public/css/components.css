@@ -361,7 +361,7 @@ select:disabled {
 }
 
 .saved-accounts-divider span {
-    background: var(--card-bg);
+    background: var(--panel-bg);
     padding: 0 12px;
     color: var(--text-secondary);
     font-size: 0.85rem;

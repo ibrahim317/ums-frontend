@@ -1,14 +1,14 @@
 /* Grades Layout */
 .term-section {
     margin-bottom: 24px;
-    background: #FFFFFF;
+    background: var(--panel-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     overflow: hidden;
 }
 
 .term-header {
-    background: #FFFFFF;
+    background: var(--panel-bg);
     padding: 12px 16px;
     cursor: pointer;
     display: flex;
@@ -19,7 +19,7 @@
 }
 
 .term-header:hover {
-    background: #F9FAFB;
+    background: var(--border-soft);
 }
 
 .term-section:not(.collapsed) .term-header {
@@ -50,7 +50,7 @@
     font-weight: 600;
     padding: 2px 8px;
     border-radius: 12px;
-    background: var(--bg-secondary, #F3F4F6);
+    background: var(--border-soft);
     color: var(--text-secondary);
     white-space: nowrap;
 }
@@ -83,7 +83,7 @@
 }
 
 .subject-card {
-    background: #FFFFFF;
+    background: var(--card-bg);
     border: 1px solid var(--border-color);
     border-radius: 4px;
     padding: 12px;
@@ -161,7 +161,7 @@
 }
 
 .academic-year-card {
-    background: #FFFFFF;
+    background: var(--panel-bg);
     border-radius: 6px;
     margin-bottom: 32px;
 }
@@ -174,5 +174,5 @@
 }
 
 .academic-year-card .term-section {
-    background: #FFFFFF;
+    background: var(--panel-bg);
 }

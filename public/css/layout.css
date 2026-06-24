@@ -37,7 +37,7 @@ body {
     justify-content: center;
     align-items: center;
     padding: 20px;
-    background: #F9FAFB;
+    background: var(--sidebar-bg);
 }
 
 .login-card {
