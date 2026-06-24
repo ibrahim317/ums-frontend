@@ -189,7 +189,13 @@
                 <div class="dashboard-panel">
                     <div id="loader" class="loader-container">
                         <div class="spinner"></div>
-                        <p>جاري جلب البيانات من النظام...</p>
+                        <p id="loader-text">جاري جلب البيانات من النظام...</p>
+                        <div id="loader-progress-container" class="hidden" style="width: 240px; margin-top: 16px;">
+                            <div style="width: 100%; height: 6px; background-color: var(--border-color); border-radius: 3px; overflow: hidden; margin-bottom: 8px;">
+                                <div id="loader-progress-bar" style="width: 0%; height: 100%; background: var(--accent-color); border-radius: 3px; transition: width 0.2s ease;"></div>
+                            </div>
+                            <div id="loader-progress-text" style="font-size: 0.8rem; color: var(--text-secondary); text-align: center; font-weight: bold;">0%</div>
+                        </div>
                     </div>
 
                     <div id="error-container" class="error-container hidden">

@@ -119,16 +119,28 @@ export class UmsService {
             return this.activeCookies;
         }
 
+        if (this._loginPromise) {
+            return this._loginPromise;
+        }
+
         const creds = this.storage.getJson('ums_credentials');
         if (!creds) {
             throw new Error('User credentials not found. Please log in again.');
         }
 
-        // Silent re-login
-        const cookies = await this._loginForCookies(creds.username, creds.password);
-        this.activeCookies = cookies;
-        this.activeCookiesTime = Date.now();
-        return cookies;
+        // Use promise coalescing for concurrent requests
+        this._loginPromise = (async () => {
+            try {
+                const cookies = await this._loginForCookies(creds.username, creds.password);
+                this.activeCookies = cookies;
+                this.activeCookiesTime = Date.now();
+                return cookies;
+            } finally {
+                this._loginPromise = null;
+            }
+        })();
+
+        return this._loginPromise;
     }
 
     /**

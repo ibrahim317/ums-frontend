@@ -104,7 +104,11 @@ export class DashboardController {
     /**
      * Displays main spinner loader.
      */
+    /**
+     * Displays main spinner loader.
+     */
     showLoader() {
+        if (this.isInitialLoading) return;
         if (this.loader) this.loader.classList.remove('hidden');
         if (this.errorContainer) this.errorContainer.classList.add('hidden');
         if (this.yearWorkTab) this.yearWorkTab.classList.add('hidden');
@@ -116,6 +120,7 @@ export class DashboardController {
      * Hides main spinner loader.
      */
     hideLoader() {
+        if (this.isInitialLoading) return;
         if (this.loader) this.loader.classList.add('hidden');
     }
 
@@ -123,7 +128,15 @@ export class DashboardController {
      * Shows error state banner.
      */
     showError(msg) {
+        // Temporarily reset initial loading to allow hiding loader and showing error banner
+        const wasInitial = this.isInitialLoading;
+        this.isInitialLoading = false;
         this.hideLoader();
+        this.isInitialLoading = wasInitial;
+
+        const progressContainer = document.getElementById('loader-progress-container');
+        if (progressContainer) progressContainer.classList.add('hidden');
+
         if (this.errorMessage) this.errorMessage.textContent = msg;
         if (this.errorContainer) this.errorContainer.classList.remove('hidden');
     }
@@ -139,44 +152,91 @@ export class DashboardController {
     }
 
     /**
-     * Boots up dashboard and kicks off background tasks.
+     * Boots up dashboard and kicks off parallel requests for fast initialization with percentage loading bar.
      */
     async initializeDashboard() {
-        this.showLoader();
+        this.isInitialLoading = true;
+        
+        const progressContainer = document.getElementById('loader-progress-container');
+        const progressBar = document.getElementById('loader-progress-bar');
+        const progressText = document.getElementById('loader-progress-text');
+        const loaderTextElement = document.getElementById('loader-text');
+        
+        if (this.loader) this.loader.classList.remove('hidden');
+        if (progressContainer) progressContainer.classList.remove('hidden');
+        if (progressBar) progressBar.style.width = '0%';
+        if (progressText) progressText.textContent = '0%';
+        if (loaderTextElement) loaderTextElement.textContent = 'جاري تهيئة البيانات...';
+        
+        let completed = 0;
+        const total = 4;
+        
+        const updateProgress = () => {
+            completed++;
+            const pct = Math.round((completed / total) * 100);
+            if (progressBar) progressBar.style.width = `${pct}%`;
+            if (progressText) progressText.textContent = `${pct}%`;
+        };
+
         try {
-            await this.loadAcademicYears();
-            await this.loadYearWorkGrades('');
+            // Task 1: Load Academic Years (needed for selector options)
+            const task1 = (async () => {
+                await this.loadAcademicYears();
+                updateProgress();
+            })();
+
+            // Task 2: Load Year-Work Grades for default current year
+            const task2 = (async () => {
+                await this.loadYearWorkGrades('', false);
+                updateProgress();
+            })();
+
+            // Task 3: Load Student Cumulative GPA (needed for tabs calculations)
+            const task3 = (async () => {
+                await this.loadGPA(false);
+                updateProgress();
+            })();
+
+            // Task 4: Load Current courses
+            const task4 = (async () => {
+                try {
+                    const response = await fetchCurrentCourses(false);
+                    const data = await response.json();
+                    if (data.success) {
+                        appState.cachedCurrentCourses = data.data;
+                        appState.currentCoursesCacheTime = data.updatedAt;
+                    }
+                } catch (err) {
+                    console.warn('Initial current courses fetch failed:', err);
+                }
+                updateProgress();
+            })();
+
+            // Fire all tasks concurrently
+            await Promise.all([task1, task2, task3, task4]);
+
+            this.isInitialLoading = false;
+            this.hideLoader();
+            if (progressContainer) progressContainer.classList.add('hidden');
+            
             if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
 
             this.checkAndUnlockSearch();
-            this.backgroundPrefetchAll();
+            this.backgroundPrefetchRemainingYears();
             this.updaterService.checkUpdates(false);
         } catch (error) {
+            this.isInitialLoading = false;
             this.showError(error.message || 'حدث خطأ غير متوقع');
         }
     }
 
     /**
-     * Prefetches GPA and remaining academic term grades asynchronously.
+     * Prefetches remaining historical academic years in the background silently for search indexing.
      */
-    async backgroundPrefetchAll() {
-        // 1. Prefetch GPA
-        try {
-            const response = await fetchGPA(false);
-            const data = await response.json();
-            if (data.success) {
-                appState.cachedGPAData = data.data;
-                appState.gpaCacheTime = data.updatedAt;
-                this.searchService.setGPAData(data.data);
-                this.checkAndUnlockSearch();
-            }
-        } catch (err) {
-            console.warn('Background GPA prefetch failed:', err);
-        }
-
-        // 2. Prefetch other year work grades
+    async backgroundPrefetchRemainingYears() {
         if (appState.cachedAcademicYears && Array.isArray(appState.cachedAcademicYears)) {
             for (const year of appState.cachedAcademicYears) {
+                if (year.Value === '') continue; // Skip default current year which was loaded initially
                 if (appState.cachedYearWorkData.has(year.Value)) continue;
                 try {
                     const response = await fetchYearWorkGrades(year.Value, false);
@@ -190,19 +250,6 @@ export class DashboardController {
                 }
             }
         }
-
-        // 3. Prefetch current courses
-        try {
-            const response = await fetchCurrentCourses(false);
-            const data = await response.json();
-            if (data.success) {
-                appState.cachedCurrentCourses = data.data;
-                appState.currentCoursesCacheTime = data.updatedAt;
-            }
-        } catch (err) {
-            console.warn('Background current courses prefetch failed:', err);
-        }
-
         this.checkAndUnlockSearch();
     }
 
