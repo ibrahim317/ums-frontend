@@ -64,7 +64,7 @@
     flex: 1;
     border: none;
     background: none;
-    font-family: 'Cairo', sans-serif;
+    font-family: var(--font-primary);
     font-size: 0.95rem;
     color: var(--text-primary);
     padding: 8px 0;
@@ -93,7 +93,7 @@
     border: none;
     border-bottom: 1px solid var(--border-color);
     cursor: pointer;
-    font-family: 'Cairo', sans-serif;
+    font-family: var(--font-primary);
     text-align: right;
     transition: background 0.15s;
     gap: 12px;
@@ -209,7 +209,7 @@
     background: none;
     border: none;
     color: var(--text-secondary);
-    font-family: 'Cairo', sans-serif;
+    font-family: var(--font-primary);
     font-size: 0.75rem;
     cursor: pointer;
     padding: 2px 6px;
@@ -270,7 +270,7 @@
     background: var(--accent-color);
     color: #FFFFFF;
     border: none;
-    font-family: 'Cairo', sans-serif;
+    font-family: var(--font-primary);
     font-size: 0.9rem;
     font-weight: 700;
     padding: 10px 24px;

@@ -233,7 +233,7 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
                         },
                         ticks: {
                             color: textColor,
-                            font: { family: 'Cairo', size: 10 }
+                            font: { family: 'Alexandria', size: 10 }
                         }
                     },
                     y: {
@@ -245,7 +245,7 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
                         },
                         ticks: {
                             color: textColor,
-                            font: { family: 'Cairo', size: 10 }
+                            font: { family: 'Alexandria', size: 10 }
                         }
                     }
                 },
@@ -286,7 +286,7 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
                         position: 'bottom',
                         labels: {
                             color: textColor,
-                            font: { family: 'Cairo', size: 10 },
+                            font: { family: 'Alexandria', size: 10 },
                             boxWidth: 10,
                             padding: 8
                         }

@@ -1,4 +1,5 @@
 :root {
+    --font-primary: 'Alexandria', sans-serif;
     --bg-color: #FFFFFF; /* Pure white background */
     --panel-bg: #FFFFFF; /* Pure white panels */
     --sidebar-bg: #F9FAFB; /* Very light grey sidebar */
