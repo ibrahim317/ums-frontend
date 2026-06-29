@@ -4,7 +4,7 @@
  */
 export class AppState {
     constructor() {
-        this.CURRENT_APP_VERSION = '1.1.0';
+        this.CURRENT_APP_VERSION = "1.2.0";
         this.clearAll();
     }
 
@@ -25,7 +25,7 @@ export class AppState {
         this.searchUnlocked = false;
         this.searchIndex = [];
         this.yearWorkEntries = []; // Array of { yearLabel, data }
-        this.currentYearWorkLabel = '';
+        this.currentYearWorkLabel = "";
 
         this.cachedCurrentCourses = null;
         this.currentCoursesCacheTime = null;
