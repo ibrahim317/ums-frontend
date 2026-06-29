@@ -176,3 +176,46 @@
 .academic-year-card .term-section {
     background: var(--panel-bg);
 }
+
+/* Summer Break Banner */
+.summer-break-banner {
+    text-align: center;
+    padding: 48px 24px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    margin: 16px 0;
+}
+
+.summer-break-icon {
+    font-size: 3.5rem;
+    margin-bottom: 16px;
+    line-height: 1;
+}
+
+.summer-break-banner h3 {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 12px 0;
+}
+
+.summer-break-banner p {
+    margin: 0 0 8px 0;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+.summer-break-banner .summer-break-sub {
+    font-size: 0.85rem;
+    opacity: 0.7;
+    margin-top: 16px;
+}
+
+.summer-break-banner .summer-break-hint {
+    font-size: 0.85rem;
+    color: var(--accent-color, #6366f1);
+    margin-top: 4px;
+    opacity: 0.9;
+}

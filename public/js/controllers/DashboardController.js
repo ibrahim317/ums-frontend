@@ -1,6 +1,6 @@
 import { fetchAcademicYears, fetchYearWorkGrades, fetchGPA, fetchCurrentCourses, fetchMyAccountInfo } from '../api.js';
 import { appState } from '../services/AppState.js';
-import { renderYearWorkGrades } from '../components/YearWorkRenderer.js';
+import { renderYearWorkGrades, renderSummerBreak } from '../components/YearWorkRenderer.js';
 import { renderGPA } from '../components/GPARenderer.js';
 import { renderPredictor } from '../components/PredictorRenderer.js';
 
@@ -37,6 +37,21 @@ export class DashboardController {
         this.settingsTabBtn = document.querySelector('[data-target="settings-tab"]');
 
         this.fetchedVersion = null;
+        this.yearWorkSummerBreak = false;
+    }
+
+    /**
+     * Detects if the current date falls within the university summer break.
+     * Summer break: ~June 17 to ~September 27.
+     */
+    _isSummerBreak() {
+        const now = new Date();
+        const month = now.getMonth(); // 0-indexed: 5=June, 6=July, 7=Aug, 8=Sep
+        const day = now.getDate();
+        if (month === 5 && day >= 17) return true;  // June 17+
+        if (month === 6 || month === 7) return true; // July, August
+        if (month === 8 && day <= 27) return true;   // September up to 27
+        return false;
     }
 
     /**
@@ -153,9 +168,11 @@ export class DashboardController {
 
     /**
      * Boots up dashboard and kicks off parallel requests for fast initialization with percentage loading bar.
+     * Each task is isolated so that one failure doesn't crash the entire dashboard.
      */
     async initializeDashboard() {
         this.isInitialLoading = true;
+        this.yearWorkSummerBreak = false;
         
         const progressContainer = document.getElementById('loader-progress-container');
         const progressBar = document.getElementById('loader-progress-bar');
@@ -170,6 +187,9 @@ export class DashboardController {
         
         let completed = 0;
         const total = 4;
+        let task1Failed = false;
+        let task2Failed = false;
+        let task3Failed = false;
         
         const updateProgress = () => {
             completed++;
@@ -178,56 +198,80 @@ export class DashboardController {
             if (progressText) progressText.textContent = `${pct}%`;
         };
 
-        try {
-            // Task 1: Load Academic Years (needed for selector options)
-            const task1 = (async () => {
+        // Task 1: Load Academic Years (needed for selector options)
+        const task1 = (async () => {
+            try {
                 await this.loadAcademicYears();
-                updateProgress();
-            })();
+            } catch (err) {
+                console.warn('Academic years fetch failed:', err);
+                task1Failed = true;
+            }
+            updateProgress();
+        })();
 
-            // Task 2: Load Year-Work Grades for default current year
-            const task2 = (async () => {
+        // Task 2: Load Year-Work Grades for default current year
+        const task2 = (async () => {
+            try {
                 await this.loadYearWorkGrades('', false);
-                updateProgress();
-            })();
-
-            // Task 3: Load Student Cumulative GPA (needed for tabs calculations)
-            const task3 = (async () => {
-                await this.loadGPA(false);
-                updateProgress();
-            })();
-
-            // Task 4: Load Current courses
-            const task4 = (async () => {
-                try {
-                    const response = await fetchCurrentCourses(false);
-                    const data = await response.json();
-                    if (data.success) {
-                        appState.cachedCurrentCourses = data.data;
-                        appState.currentCoursesCacheTime = data.updatedAt;
-                    }
-                } catch (err) {
-                    console.warn('Initial current courses fetch failed:', err);
+            } catch (err) {
+                console.warn('Year work grades fetch failed:', err);
+                task2Failed = true;
+                // If we are in summer break, show the summer banner instead of an error
+                if (this._isSummerBreak()) {
+                    this.yearWorkSummerBreak = true;
+                    renderSummerBreak('grades-container');
                 }
-                updateProgress();
-            })();
+            }
+            updateProgress();
+        })();
 
-            // Fire all tasks concurrently
-            await Promise.all([task1, task2, task3, task4]);
+        // Task 3: Load Student Cumulative GPA (needed for tabs calculations)
+        const task3 = (async () => {
+            try {
+                await this.loadGPA(false);
+            } catch (err) {
+                console.warn('GPA fetch failed:', err);
+                task3Failed = true;
+            }
+            updateProgress();
+        })();
 
-            this.isInitialLoading = false;
-            this.hideLoader();
-            if (progressContainer) progressContainer.classList.add('hidden');
-            
-            if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
+        // Task 4: Load Current courses
+        const task4 = (async () => {
+            try {
+                const response = await fetchCurrentCourses(false);
+                const data = await response.json();
+                if (data.success) {
+                    appState.cachedCurrentCourses = data.data;
+                    appState.currentCoursesCacheTime = data.updatedAt;
+                }
+            } catch (err) {
+                console.warn('Initial current courses fetch failed:', err);
+            }
+            updateProgress();
+        })();
 
-            this.checkAndUnlockSearch();
-            this.backgroundPrefetchRemainingYears();
-            this.updaterService.checkUpdates(false);
-        } catch (error) {
-            this.isInitialLoading = false;
-            this.showError(error.message || 'حدث خطأ غير متوقع');
+        // Fire all tasks concurrently — none will throw
+        await Promise.all([task1, task2, task3, task4]);
+
+        this.isInitialLoading = false;
+        this.hideLoader();
+        if (progressContainer) progressContainer.classList.add('hidden');
+
+        // If both critical tasks (year work + GPA) failed, show error
+        if (task2Failed && task3Failed && !this.yearWorkSummerBreak) {
+            this.showError('حدث خطأ أثناء جلب البيانات. تأكد من اتصالك بالإنترنت وأعد المحاولة.');
+            return;
         }
+
+        // Show the year-work tab (even if it has summer break banner)
+        if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
+
+        this.checkAndUnlockSearch();
+        if (!task1Failed) {
+            this.backgroundPrefetchRemainingYears();
+        }
+        this.updaterService.checkUpdates(false);
     }
 
     /**
@@ -259,27 +303,39 @@ export class DashboardController {
     async loadAcademicYears() {
         if (appState.cachedAcademicYears) return;
 
-        const data = await fetchAcademicYears();
-        if (data.success) {
-            appState.cachedAcademicYears = data.data;
-            if (this.yearSelect) {
-                this.yearSelect.innerHTML = '';
+        try {
+            const data = await fetchAcademicYears();
+            if (data.success) {
+                appState.cachedAcademicYears = data.data;
+                if (this.yearSelect) {
+                    this.yearSelect.innerHTML = '';
 
-                if (Array.isArray(appState.cachedAcademicYears) && appState.cachedAcademicYears.length > 0) {
-                    appState.cachedAcademicYears.forEach(year => {
-                        const option = document.createElement('option');
-                        option.value = year.Value;
-                        option.textContent = year.Text;
-                        if (year.Selected) option.selected = true;
-                        this.yearSelect.appendChild(option);
-                    });
-                    this.yearSelect.disabled = false;
-                } else {
-                    this.yearSelect.innerHTML = '<option value="">لا توجد أعوام أكاديمية متاحة</option>';
+                    if (Array.isArray(appState.cachedAcademicYears) && appState.cachedAcademicYears.length > 0) {
+                        appState.cachedAcademicYears.forEach(year => {
+                            const option = document.createElement('option');
+                            option.value = year.Value;
+                            option.textContent = year.Text;
+                            if (year.Selected) option.selected = true;
+                            this.yearSelect.appendChild(option);
+                        });
+                        this.yearSelect.disabled = false;
+                    } else {
+                        this.yearSelect.innerHTML = '<option value="">لا توجد أعوام أكاديمية متاحة</option>';
+                    }
+                }
+            } else {
+                console.warn('Academic years fetch returned error:', data.error);
+                if (this.yearSelect) {
+                    this.yearSelect.innerHTML = '<option value="">غير متاح حالياً</option>';
+                    this.yearSelect.disabled = true;
                 }
             }
-        } else {
-            throw new Error(data.error);
+        } catch (error) {
+            console.warn('Academic years fetch failed:', error);
+            if (this.yearSelect) {
+                this.yearSelect.innerHTML = '<option value="">غير متاح حالياً</option>';
+                this.yearSelect.disabled = true;
+            }
         }
     }
 
@@ -580,6 +636,14 @@ export class DashboardController {
             } else {
                 if (response.status === 401 || response.status === 403) {
                     if (this.logoutCallback) this.logoutCallback();
+                } else if (this._isSummerBreak()) {
+                    // During summer break, show friendly banner instead of error
+                    this.yearWorkSummerBreak = true;
+                    renderSummerBreak('grades-container');
+                    this.hideLoader();
+                    if (activeTargetId === 'year-work-tab') {
+                        if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
+                    }
                 } else {
                     throw new Error(data.error);
                 }

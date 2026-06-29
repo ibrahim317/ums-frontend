@@ -94,8 +94,9 @@ const fetchGPA = async (cookies) => {
     const $ = cheerio.load(response.data);
     const parsedData = { years: [] };
 
-    $('.academic-year-accordion').each((i, yearEl) => {
-        const yearTitle = $(yearEl).find('.academic-year-header span').first().text().replace(/\s+/g, ' ').trim();
+    // --- New UMS HTML structure (2025+): .ums-year > .ums-round > .ums-term > .ums-course ---
+    $('.ums-year').each((i, yearEl) => {
+        const yearTitle = $(yearEl).find('.ums-year__header-title').first().text().replace(/\s+/g, ' ').trim();
         if (!yearTitle) return;
 
         const yearObj = {
@@ -103,55 +104,110 @@ const fetchGPA = async (cookies) => {
             terms: []
         };
 
-        // There might be multiple exam rounds (e.g. دور يناير) per year, but usually it's wrapped in .year-content
-        // Actually, we'll just extract all .faq-item inside this year
-        $(yearEl).find('.faq-item').each((j, termEl) => {
-            const termTitleRaw = $(termEl).find('.faq-title button').text().replace(/\s+/g, ' ').trim();
-            const termTitle = termTitleRaw.replace(/^\d+/, '').trim();
+        // Each year can have multiple rounds (e.g. دور يناير, دور مايو)
+        $(yearEl).find('.ums-round').each((j, roundEl) => {
+            $(roundEl).find('.ums-term').each((k, termEl) => {
+                const termName = $(termEl).find('.ums-term__name').first().text().replace(/\s+/g, ' ').trim();
+                if (!termName) return;
 
-            if (!termTitle) return;
+                const termObj = {
+                    title: termName,
+                    subjects: []
+                };
 
-            const termObj = {
-                title: termTitle,
-                subjects: []
-            };
+                $(termEl).find('.ums-course').each((l, courseEl) => {
+                    const courseCode = $(courseEl).find('.ums-course__code').text().replace(/\s+/g, ' ').trim();
+                    const courseTitle = $(courseEl).find('.ums-course__title').text().replace(/\s+/g, ' ').trim();
+                    const subjectName = courseCode ? `[${courseCode}] ${courseTitle}` : courseTitle;
 
-            $(termEl).find('.price-table-box2').each((k, subjectEl) => {
-                const subjectNameRaw = $(subjectEl).find('h5').first().text().replace(/\s+/g, ' ').trim();
-                const subjectName = subjectNameRaw
-                    .replace(/^(المقرر:|Course:)\s*/i, '')
-                    .replace(/^\[.*?\]\s*/, '')
-                    .trim();
+                    let hours = '', grade = '', points = '';
 
-                let hours = '', grade = '', points = '';
+                    $(courseEl).find('.ums-course__row').each((m, rowEl) => {
+                        const label = $(rowEl).find('.ums-course__row-label').text().replace(/\s+/g, ' ').trim().toLowerCase();
+                        const value = $(rowEl).find('.ums-course__row-value').text().replace(/\s+/g, ' ').trim();
 
-                // Iterate through the rows to extract Hours, Grade, Points
-                $(subjectEl).find('.row').each((l, rowEl) => {
-                    const label = $(rowEl).find('h5').text().replace(/\s+/g, ' ').trim().toLowerCase();
-                    const value = $(rowEl).find('p').text().replace(/\s+/g, ' ').trim();
+                        if (label.includes('ساعات المقرر') || label.includes('hours')) hours = value;
+                        else if (label.includes('التقدير') || label.includes('grade')) grade = value;
+                        else if (label.includes('النقاط') || label.includes('points')) points = value;
+                    });
 
-                    if (label.includes('ساعات المقرر') || label.toLowerCase().includes('hours')) hours = value;
-                    else if (label.includes('التقدير') || label.toLowerCase().includes('grade')) grade = value;
-                    else if (label.includes('النقاط') || label.toLowerCase().includes('points')) points = value;
+                    termObj.subjects.push({
+                        name: subjectName,
+                        hours: hours,
+                        grade: grade,
+                        points: points
+                    });
                 });
 
-                termObj.subjects.push({
-                    name: subjectName,
-                    hours: hours,
-                    grade: grade,
-                    points: points
-                });
+                if (termObj.subjects.length > 0) {
+                    yearObj.terms.push(termObj);
+                }
             });
-
-            if (termObj.subjects.length > 0) {
-                yearObj.terms.push(termObj);
-            }
         });
 
         if (yearObj.terms.length > 0) {
             parsedData.years.push(yearObj);
         }
     });
+
+    // --- Fallback: Old UMS HTML structure (.academic-year-accordion) ---
+    if (parsedData.years.length === 0) {
+        $('.academic-year-accordion').each((i, yearEl) => {
+            const yearTitle = $(yearEl).find('.academic-year-header span').first().text().replace(/\s+/g, ' ').trim();
+            if (!yearTitle) return;
+
+            const yearObj = {
+                year: yearTitle,
+                terms: []
+            };
+
+            $(yearEl).find('.faq-item').each((j, termEl) => {
+                const termTitleRaw = $(termEl).find('.faq-title button').text().replace(/\s+/g, ' ').trim();
+                const termTitle = termTitleRaw.replace(/^\d+/, '').trim();
+
+                if (!termTitle) return;
+
+                const termObj = {
+                    title: termTitle,
+                    subjects: []
+                };
+
+                $(termEl).find('.price-table-box2').each((k, subjectEl) => {
+                    const subjectNameRaw = $(subjectEl).find('h5').first().text().replace(/\s+/g, ' ').trim();
+                    const subjectName = subjectNameRaw
+                        .replace(/^(المقرر:|Course:)\s*/i, '')
+                        .replace(/^\[.*?\]\s*/, '')
+                        .trim();
+
+                    let hours = '', grade = '', points = '';
+
+                    $(subjectEl).find('.row').each((l, rowEl) => {
+                        const label = $(rowEl).find('h5').text().replace(/\s+/g, ' ').trim().toLowerCase();
+                        const value = $(rowEl).find('p').text().replace(/\s+/g, ' ').trim();
+
+                        if (label.includes('ساعات المقرر') || label.toLowerCase().includes('hours')) hours = value;
+                        else if (label.includes('التقدير') || label.toLowerCase().includes('grade')) grade = value;
+                        else if (label.includes('النقاط') || label.toLowerCase().includes('points')) points = value;
+                    });
+
+                    termObj.subjects.push({
+                        name: subjectName,
+                        hours: hours,
+                        grade: grade,
+                        points: points
+                    });
+                });
+
+                if (termObj.subjects.length > 0) {
+                    yearObj.terms.push(termObj);
+                }
+            });
+
+            if (yearObj.terms.length > 0) {
+                parsedData.years.push(yearObj);
+            }
+        });
+    }
 
     return parsedData;
 }

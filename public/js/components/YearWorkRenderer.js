@@ -65,3 +65,16 @@ export const renderYearWorkGrades = (containerId, data, onSubjectOpen) => {
         container.appendChild(section);
     });
 };
+
+export const renderSummerBreak = (containerId) => {
+    const container = document.getElementById(containerId);
+    container.innerHTML = `
+        <div class="summer-break-banner">
+            <div class="summer-break-icon">☀️</div>
+            <h3>إجازة صيفية</h3>
+            <p>لا توجد درجات أعمال سنة متاحة حالياً.</p>
+            <p class="summer-break-sub">فترة الإجازة الصيفية: من ١٧ يونيو حتى ٢٧ سبتمبر تقريباً</p>
+            <p class="summer-break-hint">يمكنك الاطلاع على سجلك الأكاديمي (GPA) من القائمة الجانبية.</p>
+        </div>
+    `;
+};
