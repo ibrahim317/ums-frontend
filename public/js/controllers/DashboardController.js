@@ -459,6 +459,28 @@ export class DashboardController {
                     throw new Error(data.error || coursesData.error);
                 }
             }
+        } catch (error) {
+            console.error('Failed to load predictor data:', error);
+            const container = document.getElementById('predictor-container');
+            if (container) {
+                const isAr = (localStorage.getItem('ums_culture') || 'ar') === 'ar';
+                const errorMsg = error.message || (isAr 
+                    ? 'نظام UMS الرسمي غير متاح حالياً لعرض درجات أعمال السنة. يرجى المحاولة لاحقاً.' 
+                    : 'The official UMS is currently down for this functionality. Please try again later.');
+                
+                container.innerHTML = `
+                    <div class="error-state-card" style="text-align: center; padding: 32px 24px; margin: 24px auto; max-width: 500px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                        <div class="error-icon" style="font-size: 2.5rem; margin-bottom: 16px; color: #ef4444;">⚠️</div>
+                        <p style="font-size: 0.95rem; color: #ef4444; line-height: 1.6; margin: 0 0 16px 0; font-weight: 500;">
+                            ${errorMsg}
+                        </p>
+                    </div>
+                `;
+            }
+            this.hideLoader();
+            if (activeTargetId === 'predictor-tab') {
+                if (this.predictorTab) this.predictorTab.classList.remove('hidden');
+            }
         } finally {
             if (navRevalidateBtn) {
                 navRevalidateBtn.classList.remove('spinning');
@@ -648,6 +670,29 @@ export class DashboardController {
                     throw new Error(data.error);
                 }
             }
+        } catch (error) {
+            console.error('Failed to load year work grades:', error);
+            const container = document.getElementById('grades-container');
+            if (container) {
+                const isAr = (localStorage.getItem('ums_culture') || 'ar') === 'ar';
+                const errorMsg = error.message || (isAr 
+                    ? 'نظام UMS الرسمي غير متاح حالياً لعرض درجات أعمال السنة. يرجى المحاولة لاحقاً.' 
+                    : 'The official UMS is currently down for this functionality. Please try again later.');
+                
+                container.innerHTML = `
+                    <div class="error-state-card" style="text-align: center; padding: 32px 24px; margin: 24px auto; max-width: 500px; background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 8px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                        <div class="error-icon" style="font-size: 2.5rem; margin-bottom: 16px; color: #ef4444;">⚠️</div>
+                        <p style="font-size: 0.95rem; color: #ef4444; line-height: 1.6; margin: 0 0 16px 0; font-weight: 500;">
+                            ${errorMsg}
+                        </p>
+                    </div>
+                `;
+            }
+            this.hideLoader();
+            if (activeTargetId === 'year-work-tab') {
+                if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
+            }
+            throw error;
         } finally {
             if (navRevalidateBtn) {
                 navRevalidateBtn.classList.remove('spinning');

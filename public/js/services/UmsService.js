@@ -237,43 +237,60 @@ export class UmsService {
             }
         }
 
-        const cookies = await this.getValidCookies();
-        const culturedCookies = this._withCulture(cookies);
-        let url = 'https://ums.asu.edu.eg/YearWorkGradesForStudent/StudentYearWorkGrades';
-        let response;
+        try {
+            const cookies = await this.getValidCookies();
+            const culturedCookies = this._withCulture(cookies);
+            let url = 'https://ums.asu.edu.eg/YearWorkGradesForStudent/StudentYearWorkGrades';
+            let response;
 
-        if (yearId) {
-            response = await this.http.request({
-                url,
-                method: 'POST',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Referer': 'https://ums.asu.edu.eg/YearWorkGradesForStudent',
-                    'Cookie': culturedCookies
-                },
-                data: `AcademicYearId=${yearId}`
-            });
-        } else {
-            url = 'https://ums.asu.edu.eg/YearWorkGradesForStudent';
-            response = await this.http.request({
-                url,
-                method: 'GET',
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Referer': 'https://ums.asu.edu.eg/UserInformation/MyAccount',
-                    'Cookie': culturedCookies
-                }
-            });
+            if (yearId) {
+                response = await this.http.request({
+                    url,
+                    method: 'POST',
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Referer': 'https://ums.asu.edu.eg/YearWorkGradesForStudent',
+                        'Cookie': culturedCookies
+                    },
+                    data: `AcademicYearId=${yearId}`
+                });
+            } else {
+                url = 'https://ums.asu.edu.eg/YearWorkGradesForStudent';
+                response = await this.http.request({
+                    url,
+                    method: 'GET',
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Referer': 'https://ums.asu.edu.eg/UserInformation/MyAccount',
+                        'Cookie': culturedCookies
+                    }
+                });
+            }
+
+            const htmlText = await response.text();
+            const parsed = this.parser.parseYearWorkGrades(htmlText);
+            this.storage.setCache(cacheKey, parsed);
+            
+            return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
+        } catch (error) {
+            console.error('Error in UmsService.getYearWorkGrades:', error);
+
+            // Attempt to serve expired cache from storage
+            const cached = this.storage.getJson(cacheKey);
+            if (cached) {
+                console.log(`Serving stale cached year work grades for ${cacheKey} in UmsService as fallback.`);
+                return { success: true, data: cached.data, cached: true, fallback: true, updatedAt: cached.updatedAt };
+            }
+
+            const isAr = this.getCulture() === 'ar';
+            const errorMsg = isAr 
+                ? 'نظام UMS الرسمي غير متاح حالياً لعرض درجات أعمال السنة. يرجى المحاولة لاحقاً.' 
+                : 'The official UMS is currently down for this functionality. Please try again later.';
+            throw new Error(errorMsg);
         }
-
-        const htmlText = await response.text();
-        const parsed = this.parser.parseYearWorkGrades(htmlText);
-        this.storage.setCache(cacheKey, parsed);
-        
-        return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
     }
 
     /**

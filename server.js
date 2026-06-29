@@ -172,7 +172,29 @@ app.get('/api/grades/year-work', authenticateToken, async (req, res) => {
         res.json({ success: true, data: gradesData, cached: false, updatedAt: updatedRecord.updated_at });
     } catch (error) {
         console.error(`Error fetching year work grades for ${username}:`, error.message);
-        res.status(500).json({ success: false, error: error.message || 'Failed to retrieve year work grades.' });
+        
+        // Attempt to serve expired cache on UMS failure
+        let cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
+        if (!cacheRecord && lang === 'ar') {
+            cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(oldCacheKey);
+        }
+
+        if (cacheRecord) {
+            console.log(`Serving stale cached year work grades for ${cacheKey} as fallback due to UMS error.`);
+            return res.json({ 
+                success: true, 
+                data: JSON.parse(cacheRecord.data), 
+                cached: true, 
+                fallback: true,
+                updatedAt: cacheRecord.updated_at 
+            });
+        }
+
+        const isAr = lang === 'ar';
+        const errorMsg = isAr 
+            ? 'نظام UMS الرسمي غير متاح حالياً لعرض درجات أعمال السنة. يرجى المحاولة لاحقاً.' 
+            : 'The official UMS is currently down for this functionality. Please try again later.';
+        res.status(503).json({ success: false, error: errorMsg });
     }
 });
 
