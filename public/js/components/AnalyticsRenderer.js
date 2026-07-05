@@ -41,7 +41,7 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
     // Summer Training Count
     let summerTrainingCount = 0;
     details.forEach((val, name) => {
-        if (name.includes('التدريب الصيفي')) {
+        if (name.includes('التدريب الصيفي') || name.toLowerCase().includes('summer training')) {
             summerTrainingCount++;
         }
     });
@@ -59,15 +59,21 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
             term.subjects.forEach(subject => {
                 // Grade Counts
                 const g = (subject.grade || '').trim();
-                if (g && g !== 'غائب' && g !== 'راسب' && g !== 'F' && g !== 'E' && g !== 'ناجح') {
+                const lowerG = g.toLowerCase();
+                const isAbsent = g === 'غائب' || lowerG === 'absent';
+                const isPass = g === 'ناجح' || lowerG === 'pass';
+
+                if (g && !isAbsent && !isPass) {
                     // Normalize text grades to letters for the chart
                     let shortGrade = g;
-                    if (g.includes('امتياز مرتفع') || g.includes('امتياز اول')) shortGrade = 'A+';
+                    if (g.includes('راسب') || lowerG === 'fail' || lowerG === 'f' || lowerG === 'e') {
+                        shortGrade = 'F';
+                    } else if (g.includes('امتياز مرتفع') || g.includes('امتياز اول')) shortGrade = 'A+';
                     else if (g.includes('امتياز منخفض')) shortGrade = 'A-';
                     else if (g.includes('امتياز')) shortGrade = 'A';
-                    else if (g.includes('جيد جدا مرتفع')) shortGrade = 'B+';
-                    else if (g.includes('جيد جدا منخفض')) shortGrade = 'B-';
-                    else if (g.includes('جيد جدا')) shortGrade = 'B';
+                    else if (g.includes('جيد جدا مرتفع') || g.includes('جيد جداً مرتفع')) shortGrade = 'B+';
+                    else if (g.includes('جيد جدا منخفض') || g.includes('جيد جداً منخفض')) shortGrade = 'B-';
+                    else if (g.includes('جيد جدا') || g.includes('جيد جداً')) shortGrade = 'B';
                     else if (g.includes('جيد مرتفع')) shortGrade = 'C+';
                     else if (g.includes('جيد منخفض')) shortGrade = 'C-';
                     else if (g.includes('جيد')) shortGrade = 'C';
@@ -257,14 +263,32 @@ export const renderAnalytics = (containerId, gpaData, myAccountData) => {
 
         // Doughnut Chart
         const distCtx = document.getElementById('gradeDistChart').getContext('2d');
-        const sortedGrades = Object.keys(gradeCounts).sort();
+        const gradeOrder = ['A+', 'A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'F'];
+        const sortedGrades = Object.keys(gradeCounts).sort((a, b) => {
+            return gradeOrder.indexOf(a) - gradeOrder.indexOf(b);
+        });
         const distData = sortedGrades.map(k => gradeCounts[k]);
         const colors = sortedGrades.map(g => {
-            if (g.startsWith('A')) return '#10B981'; // Emerald Green
-            if (g.startsWith('B')) return '#3B82F6'; // Blue
-            if (g.startsWith('C')) return '#F59E0B'; // Yellow/Amber
-            if (g.startsWith('D')) return '#F97316'; // Orange
-            return '#EF4444'; // Red
+            switch (g) {
+                case 'A+': return '#059669'; // Darker Emerald
+                case 'A':  return '#10B981'; // Emerald
+                case 'A-': return '#34D399'; // Lighter Emerald
+                case 'B+': return '#2563EB'; // Darker Blue
+                case 'B':  return '#3B82F6'; // Blue
+                case 'B-': return '#60A5FA'; // Lighter Blue
+                case 'C+': return '#D97706'; // Darker Amber
+                case 'C':  return '#F59E0B'; // Amber
+                case 'C-': return '#FBBF24'; // Lighter Amber
+                case 'D+': return '#EA580C'; // Darker Orange
+                case 'D':  return '#F97316'; // Orange
+                case 'F':  return '#EF4444'; // Red
+                default:
+                    if (g.startsWith('A')) return '#10B981';
+                    if (g.startsWith('B')) return '#3B82F6';
+                    if (g.startsWith('C')) return '#F59E0B';
+                    if (g.startsWith('D')) return '#F97316';
+                    return '#EF4444';
+            }
         });
 
         new Chart(distCtx, {
