@@ -1,6 +1,6 @@
-# Building UMS Dashboard for Linux and Windows
+# Building UMS Dashboard and Android App
 
-This document describes how to build standalone executables for Linux and Windows from the source code, including copy dependencies and creating zipped releases.
+This document describes how to build standalone executables for Linux and Windows, as well as the mobile Android application.
 
 ## Prerequisites
 
@@ -71,3 +71,31 @@ You can safely remove the temporary `dist/` directory after files are copied:
 ```bash
 rm -rf dist
 ```
+
+---
+
+## Building the Android Mobile App
+
+The mobile application is built using Capacitor.
+
+### Prerequisites
+
+1. Set up the Android SDK (Android Studio is recommended).
+2. Set the `ANDROID_HOME` or `ANDROID_SDK_ROOT` environment variables if they are not already set.
+
+### Build Steps
+
+1. Sync the web assets (from the `public` directory) with Capacitor:
+   ```bash
+   npx cap sync android
+   ```
+2. Build the Android application in release mode using the Gradle wrapper:
+   ```bash
+   cd android
+   ./gradlew assembleRelease
+   ```
+3. The generated release APK will be located at `android/app/build/outputs/apk/release/app-release.apk`.
+4. Copy the compiled APK to the root directory, naming it based on the version in `package.json` (e.g. `SGP-v1.2.1.apk`):
+   ```bash
+   cp android/app/build/outputs/apk/release/app-release.apk ../SGP-v<version>.apk
+   ```
