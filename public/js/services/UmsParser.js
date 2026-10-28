@@ -59,6 +59,10 @@ export class UmsParser {
             }
         });
 
+        if (parsedData.terms.length === 0 && this._hasQuestionnaireBlockLink(doc)) {
+            parsedData.blockedByQuestionnaires = true;
+        }
+
         return parsedData;
     }
 
@@ -213,6 +217,10 @@ export class UmsParser {
             });
         }
 
+        if (parsedData.years.length === 0 && this._hasQuestionnaireBlockLink(doc)) {
+            parsedData.blockedByQuestionnaires = true;
+        }
+
         return parsedData;
     }
 
@@ -258,6 +266,223 @@ export class UmsParser {
         });
 
         return { levelText: highestLevel };
+    }
+
+    /**
+     * Checks if a document contains a block link redirecting to /Questionnaires.
+     * @param {Document} doc 
+     * @returns {boolean}
+     */
+    _hasQuestionnaireBlockLink(doc) {
+        const anchors = doc.querySelectorAll('a[href]');
+        for (const a of anchors) {
+            const href = (a.getAttribute('href') || '').trim();
+            if (/^\/Questionnaires(\/|$|\?)/i.test(href) || /ums\.asu\.edu\.eg\/Questionnaires(\/|$|\?)/i.test(href)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Parses the /Questionnaires page to extract pending questionnaires.
+     * @param {string} htmlText 
+     * @returns {Object} { questionnaires: Array<{ id, url, title, category }> }
+     */
+    parseQuestionnaires(htmlText) {
+        const doc = this._getDoc(htmlText);
+        const questionnaires = [];
+        const seenUrls = new Set();
+
+        const anchors = doc.querySelectorAll('a[href]');
+        anchors.forEach((el) => {
+            const href = (el.getAttribute('href') || '').trim();
+            if (!/\/Questionnaires\/solveQuestionnaire\//i.test(href)) return;
+            if (seenUrls.has(href)) return;
+            seenUrls.add(href);
+
+            const idMatch = href.match(/solveQuestionnaire\/(\d+)/i);
+            const id = idMatch ? idMatch[1] : href;
+
+            const cardBody = el.closest('.card-body, .card-shadow');
+            let title = '';
+            if (cardBody) {
+                const titleEl = cardBody.querySelector('.card-title, h5, h4, h6');
+                if (titleEl) title = titleEl.textContent.replace(/\s+/g, ' ').trim();
+            }
+            if (!title) title = `استبيان #${id}`;
+
+            let category = 'إستبيان';
+            const tabContent = el.closest('.tabb-content');
+            if (tabContent) {
+                if (tabContent.classList.contains('general')) category = 'إستبيانات العامة';
+                else if (tabContent.classList.contains('courses')) category = 'إستبيانات المقررات';
+                else if (tabContent.classList.contains('academicGuidence')) category = 'استبيان عن المرشد الأكاديمى';
+            }
+
+            let cleanUrl = href;
+            if (href.startsWith('http')) {
+                try {
+                    const u = new URL(href);
+                    cleanUrl = u.pathname + u.search;
+                } catch (e) {}
+            } else if (!href.startsWith('/')) {
+                cleanUrl = `/${href}`;
+            }
+
+            questionnaires.push({
+                id,
+                url: cleanUrl,
+                title,
+                category
+            });
+        });
+
+        return { questionnaires };
+    }
+
+    /**
+     * Parses an individual questionnaire form page (/Questionnaires/solveQuestionnaire/:id).
+     * @param {string} htmlText 
+     * @param {string|number|null} fallbackId 
+     * @returns {Object} Structured questionnaire form metadata and sections
+     */
+    parseQuestionnaireForm(htmlText, fallbackId = null) {
+        const doc = this._getDoc(htmlText);
+
+        const parseAddToAnswersAttr = (onchangeStr) => {
+            if (!onchangeStr) return null;
+            const m = onchangeStr.match(/AddToAnswers\(\s*(\d+)\s*,\s*(\d+)\s*,\s*this\.value\s*(?:,\s*([^,\s)]+))?\s*(?:,\s*([^,\s)]+))?\s*,?\s*\)/);
+            if (!m) return null;
+            const parseNullable = (val) => (!val || val === 'null' || val === 'undefined') ? null : (isNaN(Number(val)) ? val : Number(val));
+            return {
+                questionId: Number(m[1]),
+                answerType: Number(m[2]),
+                instructorId: parseNullable(m[3]),
+                taId: parseNullable(m[4])
+            };
+        };
+
+        const mainTitleEl = doc.querySelector('h3.main-title') || doc.querySelector('h1');
+        const title = mainTitleEl ? mainTitleEl.textContent.replace(/\s+/g, ' ').trim() : 'حل الاستبيان';
+
+        const tokenInput = doc.querySelector('input[name="__RequestVerificationToken"]');
+        const requestVerificationToken = tokenInput ? (tokenInput.value || '') : '';
+
+        let scriptText = '';
+        doc.querySelectorAll('script').forEach((s) => {
+            const t = s.textContent || '';
+            if (t.includes('ValidateQuestionnaire') || t.includes('SaveAnswer')) {
+                scriptText = t;
+            }
+        });
+
+        const qIdMatch = scriptText.match(/QuestionnaireId\s*:\s*(\d+)/);
+        const cIdMatch = scriptText.match(/CourseId\s*:\s*(\d+)/);
+        const mandatoryMatch = scriptText.match(/mandatoryQuestionIds\s*=\s*\[([\d,\s]*)\]/);
+        const advisorMatch = scriptText.match(/var\s+advisor\s*=\s*(\{[\s\S]*?\}|null)\s*;/);
+        const advisorActiveMatch = scriptText.match(/var\s+AdvisorId\s*=\s*(\d+)\s*==\s*2/);
+
+        let academicAdvisorId = null;
+        if (advisorMatch && advisorMatch[1] && advisorMatch[1] !== 'null') {
+            try {
+                const adv = JSON.parse(advisorMatch[1]);
+                if (!advisorActiveMatch || advisorActiveMatch[1] === '2') {
+                    academicAdvisorId = adv?.MemberId ?? null;
+                }
+            } catch (e) {}
+        }
+
+        const mandatoryQuestionIds = mandatoryMatch
+            ? mandatoryMatch[1].split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n))
+            : [];
+        const mandatorySet = new Set(mandatoryQuestionIds);
+        const sections = [];
+
+        doc.querySelectorAll('form .row.card-shadow').forEach((cardEl, sIdx) => {
+            const headerEl = cardEl.querySelector('.section-header');
+            const sectionTitle = headerEl ? headerEl.textContent.replace(/\s+/g, ' ').trim() : `القسم ${sIdx + 1}`;
+            const questions = [];
+
+            cardEl.querySelectorAll('.question-label').forEach((qLabelEl) => {
+                const qText = qLabelEl.textContent.replace(/\s+/g, ' ').trim();
+                const hasMandatoryIcon = !!qLabelEl.querySelector('.mandatory_icon');
+
+                let questionMeta = null;
+                let inputType = 'radio';
+                const options = [];
+                let note = '';
+
+                let sib = qLabelEl.nextElementSibling;
+                while (sib && !sib.classList.contains('question-label') && !sib.classList.contains('section-header')) {
+                    const formChecks = sib.classList.contains('form-check')
+                        ? [sib]
+                        : Array.from(sib.querySelectorAll('.form-check'));
+
+                    formChecks.forEach((fc) => {
+                        const inp = fc.querySelector('input');
+                        if (!inp) return;
+                        const meta = parseAddToAnswersAttr(inp.getAttribute('onchange'));
+                        if (meta && !questionMeta) questionMeta = meta;
+                        inputType = (inp.getAttribute('type') || 'radio').toLowerCase();
+                        const lblEl = fc.querySelector('label');
+                        const label = lblEl ? lblEl.textContent.replace(/\s+/g, ' ').trim() : (inp.value || '');
+                        options.push({
+                            value: inp.value,
+                            label
+                        });
+                    });
+
+                    const textareas = sib.tagName.toLowerCase() === 'textarea'
+                        ? [sib]
+                        : Array.from(sib.querySelectorAll('textarea'));
+
+                    textareas.forEach((ta) => {
+                        const meta = parseAddToAnswersAttr(ta.getAttribute('onchange') || ta.getAttribute('oninput'));
+                        if (meta && !questionMeta) questionMeta = meta;
+                        inputType = 'textarea';
+                    });
+
+                    if (formChecks.length === 0 && textareas.length === 0) {
+                        const pText = sib.textContent.replace(/\s+/g, ' ').trim();
+                        if (pText) note = pText;
+                    }
+
+                    sib = sib.nextElementSibling;
+                }
+
+                if (questionMeta) {
+                    const isMandatory = hasMandatoryIcon || mandatorySet.has(questionMeta.questionId);
+                    questions.push({
+                        ...questionMeta,
+                        text: qText,
+                        mandatory: isMandatory,
+                        inputType,
+                        options,
+                        note
+                    });
+                }
+            });
+
+            if (questions.length > 0) {
+                const isEvaluationSection = sectionTitle.includes('بنود التقييم') || questions.some(q => q.answerType === 2);
+                sections.push({
+                    title: sectionTitle,
+                    isEvaluationSection,
+                    questions
+                });
+            }
+        });
+
+        return {
+            title,
+            questionnaireId: qIdMatch ? parseInt(qIdMatch[1], 10) : (fallbackId ? parseInt(fallbackId, 10) : null),
+            courseId: cIdMatch ? parseInt(cIdMatch[1], 10) : 0,
+            academicAdvisorId,
+            requestVerificationToken,
+            mandatoryQuestionIds,
+            sections
+        };
     }
 
     _getDoc(htmlText) {

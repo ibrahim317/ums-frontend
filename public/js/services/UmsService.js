@@ -232,7 +232,7 @@ export class UmsService {
         const cacheKey = this._cacheKey(`cache_yearwork_${yearId || 'default'}`);
         if (!force) {
             const cached = this.storage.getCache(cacheKey, 5 * 60 * 1000);
-            if (cached) {
+            if (cached && !cached.data?.blockedByQuestionnaires) {
                 return { success: true, data: cached.data, cached: true, updatedAt: cached.updatedAt };
             }
         }
@@ -272,6 +272,18 @@ export class UmsService {
 
             const htmlText = await response.text();
             const parsed = this.parser.parseYearWorkGrades(htmlText);
+
+            if (parsed.blockedByQuestionnaires) {
+                try {
+                    const qRes = await this.getQuestionnaires();
+                    parsed.questionnaires = qRes.data?.questionnaires || [];
+                } catch (e) {
+                    console.warn('Failed to auto-fetch questionnaires on blocked year work:', e);
+                    parsed.questionnaires = [];
+                }
+                return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
+            }
+
             this.storage.setCache(cacheKey, parsed);
             
             return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
@@ -301,7 +313,7 @@ export class UmsService {
         const cacheKey = this._cacheKey('cache_gpa');
         if (!force) {
             const cached = this.storage.getCache(cacheKey, 6 * 30 * 24 * 60 * 60 * 1000);
-            if (cached) {
+            if (cached && !cached.data?.blockedByQuestionnaires) {
                 return { success: true, data: cached.data, cached: true, updatedAt: cached.updatedAt };
             }
         }
@@ -320,6 +332,18 @@ export class UmsService {
 
         const htmlText = await response.text();
         const parsed = this.parser.parseGPA(htmlText);
+
+        if (parsed.blockedByQuestionnaires) {
+            try {
+                const qRes = await this.getQuestionnaires();
+                parsed.questionnaires = qRes.data?.questionnaires || [];
+            } catch (e) {
+                console.warn('Failed to auto-fetch questionnaires on blocked GPA:', e);
+                parsed.questionnaires = [];
+            }
+            return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
+        }
+
         this.storage.setCache(cacheKey, parsed);
 
         return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
@@ -386,5 +410,105 @@ export class UmsService {
         this.storage.setCache(cacheKey, parsed);
 
         return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
+    }
+
+    /**
+     * Fetches pending questionnaires from /Questionnaires.
+     */
+    async getQuestionnaires() {
+        const cookies = await this.getValidCookies();
+        const response = await this.http.request({
+            url: 'https://ums.asu.edu.eg/Questionnaires',
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Referer': 'https://ums.asu.edu.eg/StudentGrades',
+                'Cookie': this._withCulture(cookies)
+            }
+        });
+
+        const htmlText = await response.text();
+        const parsed = this.parser.parseQuestionnaires(htmlText);
+        return { success: true, data: parsed, updatedAt: new Date().toISOString() };
+    }
+
+    /**
+     * Fetches a specific questionnaire form (/Questionnaires/solveQuestionnaire/:id).
+     */
+    async getQuestionnaireForm(urlOrId) {
+        let pathUrl = String(urlOrId || '').trim();
+        if (/^\d+$/.test(pathUrl)) {
+            pathUrl = `/Questionnaires/solveQuestionnaire/${pathUrl}`;
+        } else if (!pathUrl.startsWith('/')) {
+            pathUrl = `/${pathUrl}`;
+        }
+        const idMatch = pathUrl.match(/solveQuestionnaire\/(\d+)/i);
+        const fallbackId = idMatch ? idMatch[1] : null;
+
+        const cookies = await this.getValidCookies();
+        const response = await this.http.request({
+            url: `https://ums.asu.edu.eg${pathUrl}`,
+            method: 'GET',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Referer': 'https://ums.asu.edu.eg/Questionnaires',
+                'Cookie': this._withCulture(cookies)
+            }
+        });
+
+        const newSetCookie = HttpClient.extractCookies(HttpClient.getHeaderValue(response.headers, 'set-cookie'));
+        if (newSetCookie && this.activeCookies) {
+            this.activeCookies = HttpClient.mergeCookies(this.activeCookies, newSetCookie);
+        }
+
+        const htmlText = await response.text();
+        const parsed = this.parser.parseQuestionnaireForm(htmlText, fallbackId);
+        return { success: true, data: parsed, updatedAt: new Date().toISOString() };
+    }
+
+    /**
+     * Submits a completed questionnaire via /Questionnaires/SaveAnswer.
+     */
+    async submitQuestionnaire(payload) {
+        const {
+            answersList,
+            questionnaireId,
+            courseId = 0,
+            academicAdvisorId = null,
+            requestVerificationToken
+        } = payload;
+
+        const cookies = await this.getValidCookies();
+        const params = new URLSearchParams();
+        params.append('AnswersList', typeof answersList === 'string' ? answersList : JSON.stringify(answersList || []));
+        params.append('QuestionnaireId', String(questionnaireId));
+        params.append('CourseId', String(courseId ?? 0));
+        params.append('AcademicAdvisorId', academicAdvisorId != null ? String(academicAdvisorId) : '');
+        params.append('__RequestVerificationToken', requestVerificationToken || '');
+
+        const response = await this.http.request({
+            url: 'https://ums.asu.edu.eg/Questionnaires/SaveAnswer',
+            method: 'POST',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+                'Accept': 'application/json, text/javascript, */*; q=0.01',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'Origin': 'https://ums.asu.edu.eg',
+                'Referer': `https://ums.asu.edu.eg/Questionnaires/solveQuestionnaire/${questionnaireId}`,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Cookie': this._withCulture(cookies)
+            },
+            data: params.toString()
+        });
+
+        const result = await response.json();
+        const isSuccess = Boolean(result && result.success);
+        return {
+            success: isSuccess,
+            data: result,
+            error: isSuccess ? null : 'فشل في حفظ إجابات الاستبيان.'
+        };
     }
 }

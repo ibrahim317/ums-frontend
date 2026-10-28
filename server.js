@@ -43,7 +43,8 @@ app.post('/api/login', async (req, res) => {
 
     try {
         // Attempt live login with UMS to verify credentials
-        await umsClient.loginToUMS(username, password);
+        const initialCookies = await umsClient.loginToUMS(username, password);
+        sessionCookiesMap.set(username, { cookies: initialCookies, time: Date.now() });
 
         // If successful, upsert the credentials in SQLite
         const stmt = db.prepare(`
@@ -63,13 +64,49 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+// In-memory session cookie store to preserve anti-forgery tokens across GET/POST requests
+const sessionCookiesMap = new Map();
+
+const mergeCookieStrings = (oldCookies, setCookieHeader) => {
+    const cookieMap = new Map();
+    const parseCookieStr = (str) => {
+        if (!str) return;
+        str.split(';').forEach(part => {
+            const trimmed = part.trim();
+            const eqIdx = trimmed.indexOf('=');
+            if (eqIdx > 0) {
+                const k = trimmed.slice(0, eqIdx).trim();
+                const v = trimmed.slice(eqIdx + 1).trim();
+                if (!['path', 'domain', 'expires', 'secure', 'httponly', 'samesite'].includes(k.toLowerCase())) {
+                    cookieMap.set(k, v);
+                }
+            }
+        });
+    };
+    parseCookieStr(oldCookies);
+    if (Array.isArray(setCookieHeader)) {
+        setCookieHeader.forEach(c => parseCookieStr(c.split(';')[0]));
+    } else if (typeof setCookieHeader === 'string') {
+        parseCookieStr(setCookieHeader.split(';')[0]);
+    }
+    return Array.from(cookieMap.entries()).map(([k, v]) => `${k}=${v}`).join('; ');
+};
+
 // Helper function to get valid cookies for a user
-const getValidCookies = async (username) => {
+const getValidCookies = async (username, forceRelogin = false) => {
+    const cached = sessionCookiesMap.get(username);
+    if (!forceRelogin && cached && (Date.now() - cached.time < 15 * 60 * 1000)) {
+        return cached.cookies;
+    }
+
     const userRecord = db.prepare('SELECT password FROM users WHERE username = ?').get(username);
     if (!userRecord) {
         throw new Error('User credentials not found. Please log in again.');
     }
-    return await umsClient.loginToUMS(username, userRecord.password);
+    const rawCookies = await umsClient.loginToUMS(username, userRecord.password);
+    const cleanCookies = mergeCookieStrings(rawCookies, null);
+    sessionCookiesMap.set(username, { cookies: cleanCookies, time: Date.now() });
+    return cleanCookies;
 };
 
 const getCulturedCookies = (cookies, lang) => {
@@ -146,12 +183,13 @@ app.get('/api/grades/year-work', authenticateToken, async (req, res) => {
             }
 
             if (cacheRecord) {
+                const parsedCache = JSON.parse(cacheRecord.data);
                 const updatedAt = new Date(cacheRecord.updated_at + 'Z');
                 const diffSeconds = (new Date() - updatedAt) / 1000;
 
-                if (diffSeconds < 300) { // 5 minutes TTL
+                if (!parsedCache.blockedByQuestionnaires && diffSeconds < 300) { // 5 minutes TTL
                     console.log(`Serving cached year work grades for ${cacheKey}`);
-                    return res.json({ success: true, data: JSON.parse(cacheRecord.data), cached: true, updatedAt: cacheRecord.updated_at });
+                    return res.json({ success: true, data: parsedCache, cached: true, updatedAt: cacheRecord.updated_at });
                 }
             }
         }
@@ -160,6 +198,10 @@ app.get('/api/grades/year-work', authenticateToken, async (req, res) => {
         const cookies = await getValidCookies(username);
         const culturedCookies = getCulturedCookies(cookies, lang);
         const gradesData = await gradesService.fetchYearWorkGrades(culturedCookies, req.query.yearId);
+
+        if (gradesData.blockedByQuestionnaires) {
+            return res.json({ success: true, data: gradesData, cached: false, updatedAt: new Date().toISOString() });
+        }
 
         db.prepare(`
             INSERT INTO cache (cache_key, username, data, updated_at) 
@@ -220,12 +262,13 @@ app.get('/api/grades/gpa', authenticateToken, async (req, res) => {
             }
 
             if (cacheRecord) {
+                const parsedCache = JSON.parse(cacheRecord.data);
                 const updatedAt = new Date(cacheRecord.updated_at + 'Z');
                 const diffSeconds = (new Date() - updatedAt) / 1000;
 
-                if (diffSeconds < 60 * 60 * 24 * 30 * 6) { // 6 Months
+                if (!parsedCache.blockedByQuestionnaires && diffSeconds < 60 * 60 * 24 * 30 * 6) { // 6 Months
                     console.log(`Serving cached GPA for ${cacheKey}`);
-                    return res.json({ success: true, data: JSON.parse(cacheRecord.data), cached: true, updatedAt: cacheRecord.updated_at });
+                    return res.json({ success: true, data: parsedCache, cached: true, updatedAt: cacheRecord.updated_at });
                 }
             }
         }
@@ -234,6 +277,10 @@ app.get('/api/grades/gpa', authenticateToken, async (req, res) => {
         const cookies = await getValidCookies(username);
         const culturedCookies = getCulturedCookies(cookies, lang);
         const gpaData = await gradesService.fetchGPA(culturedCookies);
+
+        if (gpaData.blockedByQuestionnaires) {
+            return res.json({ success: true, data: gpaData, cached: false, updatedAt: new Date().toISOString() });
+        }
 
         db.prepare(`
             INSERT INTO cache (cache_key, username, data, updated_at) 
@@ -331,6 +378,72 @@ app.get('/api/grades/my-account', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(`Error fetching my account for ${username}:`, error.message);
         res.status(500).json({ success: false, error: error.message || 'Failed to retrieve account info.' });
+    }
+});
+
+// --- QUESTIONNAIRES ENDPOINTS ---
+app.get('/api/questionnaires', authenticateToken, async (req, res) => {
+    const username = req.user.username;
+    const lang = req.headers['x-culture'] || 'ar';
+
+    try {
+        const cookies = await getValidCookies(username);
+        const culturedCookies = getCulturedCookies(cookies, lang);
+        const data = await gradesService.fetchQuestionnaires(culturedCookies);
+        res.json({ success: true, data, updatedAt: new Date().toISOString() });
+    } catch (error) {
+        console.error(`Error fetching questionnaires for ${username}:`, error.message);
+        res.status(500).json({ success: false, error: error.message || 'Failed to retrieve questionnaires.' });
+    }
+});
+
+app.get('/api/questionnaires/form', authenticateToken, async (req, res) => {
+    const username = req.user.username;
+    const lang = req.headers['x-culture'] || 'ar';
+    const urlOrId = req.query.url || req.query.id;
+
+    if (!urlOrId) {
+        return res.status(400).json({ success: false, error: 'Questionnaire URL or ID is required.' });
+    }
+
+    try {
+        const cookies = await getValidCookies(username);
+        const culturedCookies = getCulturedCookies(cookies, lang);
+        const { form, setCookieHeader } = await gradesService.fetchQuestionnaireForm(culturedCookies, urlOrId);
+        if (setCookieHeader) {
+            const merged = mergeCookieStrings(cookies, setCookieHeader);
+            sessionCookiesMap.set(username, { cookies: merged, time: Date.now() });
+        }
+        res.json({ success: true, data: form, updatedAt: new Date().toISOString() });
+    } catch (error) {
+        console.error(`Error fetching questionnaire form for ${username}:`, error.message);
+        res.status(500).json({ success: false, error: error.message || 'Failed to retrieve questionnaire form.' });
+    }
+});
+
+app.post('/api/questionnaires/submit', authenticateToken, async (req, res) => {
+    const username = req.user.username;
+    const lang = req.headers['x-culture'] || 'ar';
+
+    try {
+        const cookies = await getValidCookies(username);
+        const culturedCookies = getCulturedCookies(cookies, lang);
+        const result = await gradesService.submitQuestionnaire(culturedCookies, req.body);
+
+        const isSuccess = Boolean(result && result.success);
+        if (isSuccess) {
+            // Clear any cached grades for this user so newly unlocked grades are fetched fresh
+            db.prepare('DELETE FROM cache WHERE username = ?').run(username);
+        }
+
+        res.json({
+            success: isSuccess,
+            data: result,
+            error: isSuccess ? null : 'فشل في حفظ إجابات الاستبيان.'
+        });
+    } catch (error) {
+        console.error(`Error submitting questionnaire for ${username}:`, error.message);
+        res.status(500).json({ success: false, error: error.message || 'Failed to submit questionnaire.' });
     }
 });
 

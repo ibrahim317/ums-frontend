@@ -29,10 +29,10 @@ export const renderPredictor = (containerId, yearWorkData, currentCoursesData) =
         coursesGrid.style.gap = '15px';
 
         const gradeOptions = [
-            { label: 'A+ (4.0)', val: 4.0 }, { label: 'A (3.7)', val: 3.7 }, { label: 'A- (3.3)', val: 3.3 },
-            { label: 'B+ (3.0)', val: 3.0 }, { label: 'B (2.7)', val: 2.7 }, { label: 'B- (2.3)', val: 2.3 },
-            { label: 'C+ (2.0)', val: 2.0 }, { label: 'C (1.7)', val: 1.7 }, { label: 'C- (1.3)', val: 1.3 },
-            { label: 'D+ (1.0)', val: 1.0 }, { label: 'D (0.7)', val: 0.7 }, { label: 'F (0.0)', val: 0.0 }
+            { label: 'A+ (4.0)', val: 4.0 }, { label: 'A (4.0)', val: 4.0 }, { label: 'A- (3.7)', val: 3.7 },
+            { label: 'B+ (3.3)', val: 3.3 }, { label: 'B (3.0)', val: 3.0 }, { label: 'B- (2.7)', val: 2.7 },
+            { label: 'C+ (2.3)', val: 2.3 }, { label: 'C (2.0)', val: 2.0 }, { label: 'C- (1.7)', val: 1.7 },
+            { label: 'D+ (1.3)', val: 1.3 }, { label: 'D (1.0)', val: 1.0 }, { label: 'F (0.0)', val: 0.0 }
         ].map(opt => `<option value="${opt.val}">${opt.label}</option>`).join('');
 
         const courseInputs = [];

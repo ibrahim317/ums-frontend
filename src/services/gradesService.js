@@ -1,6 +1,260 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 
+const hasQuestionnaireBlockLink = ($) => {
+    let blocked = false;
+    $('a[href]').each((i, el) => {
+        const href = ($(el).attr('href') || '').trim();
+        if (/^\/Questionnaires(\/|$|\?)/i.test(href) || /ums\.asu\.edu\.eg\/Questionnaires(\/|$|\?)/i.test(href)) {
+            blocked = true;
+            return false;
+        }
+    });
+    return blocked;
+};
+
+const parseQuestionnairesHtml = (html) => {
+    const $ = cheerio.load(html);
+    const questionnaires = [];
+    const seenUrls = new Set();
+
+    $('a[href]').each((i, el) => {
+        const href = ($(el).attr('href') || '').trim();
+        if (!/\/Questionnaires\/solveQuestionnaire\//i.test(href)) return;
+        if (seenUrls.has(href)) return;
+        seenUrls.add(href);
+
+        const idMatch = href.match(/solveQuestionnaire\/(\d+)/i);
+        const id = idMatch ? idMatch[1] : href;
+
+        const cardBody = $(el).closest('.card-body, .card-shadow');
+        let title = cardBody.find('.card-title, h5, h4, h6').first().text().replace(/\s+/g, ' ').trim();
+        if (!title) {
+            title = `استبيان #${id}`;
+        }
+
+        let category = 'إستبيان';
+        const tabContent = $(el).closest('.tabb-content');
+        if (tabContent.hasClass('general')) category = 'إستبيانات العامة';
+        else if (tabContent.hasClass('courses')) category = 'إستبيانات المقررات';
+        else if (tabContent.hasClass('academicGuidence')) category = 'استبيان عن المرشد الأكاديمى';
+
+        questionnaires.push({
+            id,
+            url: href.startsWith('http') ? new URL(href).pathname + new URL(href).search : (href.startsWith('/') ? href : `/${href}`),
+            title,
+            category
+        });
+    });
+
+    return { questionnaires };
+};
+
+const fetchQuestionnaires = async (cookies) => {
+    const url = 'https://ums.asu.edu.eg/Questionnaires';
+    const response = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Referer': 'https://ums.asu.edu.eg/StudentGrades',
+            'Cookie': cookies
+        }
+    });
+
+    return parseQuestionnairesHtml(response.data);
+};
+
+const parseAddToAnswersAttr = (onchangeStr) => {
+    if (!onchangeStr) return null;
+    const m = onchangeStr.match(/AddToAnswers\(\s*(\d+)\s*,\s*(\d+)\s*,\s*this\.value\s*(?:,\s*([^,\s)]+))?\s*(?:,\s*([^,\s)]+))?\s*,?\s*\)/);
+    if (!m) return null;
+    const parseNullable = (val) => (!val || val === 'null' || val === 'undefined') ? null : (isNaN(Number(val)) ? val : Number(val));
+    return {
+        questionId: Number(m[1]),
+        answerType: Number(m[2]),
+        instructorId: parseNullable(m[3]),
+        taId: parseNullable(m[4])
+    };
+};
+
+const parseQuestionnaireFormHtml = (html, fallbackId = null) => {
+    const $ = cheerio.load(html);
+
+    const title = $('h3.main-title').first().text().replace(/\s+/g, ' ').trim() ||
+        $('h1').first().text().replace(/\s+/g, ' ').trim() ||
+        'حل الاستبيان';
+
+    const requestVerificationToken = $('input[name="__RequestVerificationToken"]').first().val() || '';
+
+    let scriptText = '';
+    $('script').each((i, el) => {
+        const t = $(el).html() || '';
+        if (t.includes('ValidateQuestionnaire') || t.includes('SaveAnswer')) {
+            scriptText = t;
+        }
+    });
+
+    const qIdMatch = scriptText.match(/QuestionnaireId\s*:\s*(\d+)/);
+    const cIdMatch = scriptText.match(/CourseId\s*:\s*(\d+)/);
+    const mandatoryMatch = scriptText.match(/mandatoryQuestionIds\s*=\s*\[([\d,\s]*)\]/);
+    const advisorMatch = scriptText.match(/var\s+advisor\s*=\s*(\{[\s\S]*?\}|null)\s*;/);
+    const advisorActiveMatch = scriptText.match(/var\s+AdvisorId\s*=\s*(\d+)\s*==\s*2/);
+
+    let academicAdvisorId = null;
+    if (advisorMatch && advisorMatch[1] && advisorMatch[1] !== 'null') {
+        try {
+            const adv = JSON.parse(advisorMatch[1]);
+            if (!advisorActiveMatch || advisorActiveMatch[1] === '2') {
+                academicAdvisorId = adv?.MemberId ?? null;
+            }
+        } catch (e) {
+            // ignore JSON parse error
+        }
+    }
+
+    const mandatoryQuestionIds = mandatoryMatch
+        ? mandatoryMatch[1].split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n))
+        : [];
+
+    const mandatorySet = new Set(mandatoryQuestionIds);
+    const sections = [];
+
+    $('form .row.card-shadow').each((sIdx, cardEl) => {
+        const sectionTitle = $(cardEl).find('.section-header').first().text().replace(/\s+/g, ' ').trim() || `القسم ${sIdx + 1}`;
+        const questions = [];
+
+        $(cardEl).find('.question-label').each((qIdx, qLabelEl) => {
+            const qText = $(qLabelEl).text().replace(/\s+/g, ' ').trim();
+            const hasMandatoryIcon = $(qLabelEl).find('.mandatory_icon').length > 0;
+
+            let questionMeta = null;
+            let inputType = 'radio';
+            const options = [];
+            let note = '';
+
+            let sib = $(qLabelEl).next();
+            while (sib.length && !sib.hasClass('question-label') && !sib.hasClass('section-header')) {
+                const formChecks = sib.hasClass('form-check') ? sib : sib.find('.form-check');
+                formChecks.each((j, fc) => {
+                    const inp = $(fc).find('input').first();
+                    if (!inp.length) return;
+                    const meta = parseAddToAnswersAttr(inp.attr('onchange'));
+                    if (meta && !questionMeta) questionMeta = meta;
+                    inputType = (inp.attr('type') || 'radio').toLowerCase();
+                    const label = $(fc).find('label').text().replace(/\s+/g, ' ').trim() || inp.val();
+                    options.push({
+                        value: inp.val(),
+                        label
+                    });
+                });
+
+                const textareas = sib.is('textarea') ? sib : sib.find('textarea');
+                textareas.each((j, ta) => {
+                    const meta = parseAddToAnswersAttr($(ta).attr('onchange') || $(ta).attr('oninput'));
+                    if (meta && !questionMeta) questionMeta = meta;
+                    inputType = 'textarea';
+                });
+
+                if (formChecks.length === 0 && textareas.length === 0) {
+                    const pText = sib.text().replace(/\s+/g, ' ').trim();
+                    if (pText) note = pText;
+                }
+
+                sib = sib.next();
+            }
+
+            if (questionMeta) {
+                const isMandatory = hasMandatoryIcon || mandatorySet.has(questionMeta.questionId);
+                questions.push({
+                    ...questionMeta,
+                    text: qText,
+                    mandatory: isMandatory,
+                    inputType,
+                    options,
+                    note
+                });
+            }
+        });
+
+        if (questions.length > 0) {
+            const isEvaluationSection = sectionTitle.includes('بنود التقييم') || questions.some(q => q.answerType === 2);
+            sections.push({
+                title: sectionTitle,
+                isEvaluationSection,
+                questions
+            });
+        }
+    });
+
+    return {
+        title,
+        questionnaireId: qIdMatch ? parseInt(qIdMatch[1], 10) : (fallbackId ? parseInt(fallbackId, 10) : null),
+        courseId: cIdMatch ? parseInt(cIdMatch[1], 10) : 0,
+        academicAdvisorId,
+        requestVerificationToken,
+        mandatoryQuestionIds,
+        sections
+    };
+};
+
+const fetchQuestionnaireForm = async (cookies, urlOrId) => {
+    let pathUrl = String(urlOrId || '').trim();
+    if (/^\d+$/.test(pathUrl)) {
+        pathUrl = `/Questionnaires/solveQuestionnaire/${pathUrl}`;
+    } else if (!pathUrl.startsWith('/')) {
+        pathUrl = `/${pathUrl}`;
+    }
+    const idMatch = pathUrl.match(/solveQuestionnaire\/(\d+)/i);
+    const fallbackId = idMatch ? idMatch[1] : null;
+
+    const fullUrl = `https://ums.asu.edu.eg${pathUrl}`;
+    const response = await axios.get(fullUrl, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            'Referer': 'https://ums.asu.edu.eg/Questionnaires',
+            'Cookie': cookies
+        }
+    });
+
+    const form = parseQuestionnaireFormHtml(response.data, fallbackId);
+    return {
+        form,
+        setCookieHeader: response.headers['set-cookie'] || null
+    };
+};
+
+const submitQuestionnaire = async (cookies, payload) => {
+    const {
+        answersList,
+        questionnaireId,
+        courseId = 0,
+        academicAdvisorId = null,
+        requestVerificationToken
+    } = payload;
+
+    const params = new URLSearchParams();
+    params.append('AnswersList', typeof answersList === 'string' ? answersList : JSON.stringify(answersList || []));
+    params.append('QuestionnaireId', String(questionnaireId));
+    params.append('CourseId', String(courseId ?? 0));
+    params.append('AcademicAdvisorId', academicAdvisorId != null ? String(academicAdvisorId) : '');
+    params.append('__RequestVerificationToken', requestVerificationToken || '');
+
+    const response = await axios.post('https://ums.asu.edu.eg/Questionnaires/SaveAnswer', params.toString(), {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Origin': 'https://ums.asu.edu.eg',
+            'Referer': `https://ums.asu.edu.eg/Questionnaires/solveQuestionnaire/${questionnaireId}`,
+            'X-Requested-With': 'XMLHttpRequest',
+            'Cookie': cookies
+        }
+    });
+
+    return response.data;
+};
+
 const fetchAcademicYears = async (cookies) => {
     const url = 'https://ums.asu.edu.eg/StudentGrades/GetAllStudentAcademicYears';
     const response = await axios.get(url, {
@@ -76,6 +330,17 @@ const fetchYearWorkGrades = async (cookies, yearId) => {
             parsedData.terms.push(termObj);
         }
     });
+
+    if (parsedData.terms.length === 0 && hasQuestionnaireBlockLink($)) {
+        parsedData.blockedByQuestionnaires = true;
+        try {
+            const qData = await fetchQuestionnaires(cookies);
+            parsedData.questionnaires = qData.questionnaires || [];
+        } catch (err) {
+            console.warn('Failed to auto-fetch questionnaires on blocked year work:', err.message);
+            parsedData.questionnaires = [];
+        }
+    }
 
     return parsedData;
 };
@@ -209,6 +474,17 @@ const fetchGPA = async (cookies) => {
         });
     }
 
+    if (parsedData.years.length === 0 && hasQuestionnaireBlockLink($)) {
+        parsedData.blockedByQuestionnaires = true;
+        try {
+            const qData = await fetchQuestionnaires(cookies);
+            parsedData.questionnaires = qData.questionnaires || [];
+        } catch (err) {
+            console.warn('Failed to auto-fetch questionnaires on blocked GPA:', err.message);
+            parsedData.questionnaires = [];
+        }
+    }
+
     return parsedData;
 }
 
@@ -270,5 +546,11 @@ module.exports = {
     fetchYearWorkGrades,
     fetchGPA,
     fetchCurrentCourses,
-    fetchMyAccountInfo
+    fetchMyAccountInfo,
+    fetchQuestionnaires,
+    fetchQuestionnaireForm,
+    submitQuestionnaire,
+    parseQuestionnairesHtml,
+    parseQuestionnaireFormHtml,
+    hasQuestionnaireBlockLink
 };

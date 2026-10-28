@@ -3,6 +3,7 @@ import { appState } from '../services/AppState.js';
 import { renderYearWorkGrades, renderSummerBreak } from '../components/YearWorkRenderer.js';
 import { renderGPA } from '../components/GPARenderer.js';
 import { renderPredictor } from '../components/PredictorRenderer.js';
+import { renderQuestionnaireBlock } from '../components/QuestionnaireRenderer.js';
 
 /**
  * DashboardController - Orchestrates academic year selections, tab views,
@@ -285,7 +286,7 @@ export class DashboardController {
                 try {
                     const response = await fetchYearWorkGrades(year.Value, false);
                     const data = await response.json();
-                    if (data.success) {
+                    if (data.success && !data.data?.blockedByQuestionnaires) {
                         appState.cachedYearWorkData.set(year.Value, { data: data.data, updatedAt: data.updatedAt });
                         this.searchService.addYearWorkData(year.Text, data.data);
                     }
@@ -383,6 +384,30 @@ export class DashboardController {
     }
 
     /**
+     * Called when all blocking questionnaires have been completed.
+     * Clears blocked state and reloads grades and GPA from UMS.
+     */
+    async _handleQuestionnairesCompleted() {
+        appState.cachedGPAData = null;
+        appState.currentYearWorkGrades = null;
+        appState.cachedYearWorkData.clear();
+
+        const selectedYear = this.yearSelect ? this.yearSelect.value : '';
+        await Promise.allSettled([
+            this.loadYearWorkGrades(selectedYear, true),
+            this.loadGPA(true)
+        ]);
+
+        const activeLink = document.querySelector('.sidebar-link.active');
+        const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
+        if (activeTargetId === 'predictor-tab') {
+            await this.loadPredictorData(true);
+        } else if (activeTargetId === 'analytics-tab') {
+            await this.loadAnalyticsData(true);
+        }
+    }
+
+    /**
      * Loads predictive semester grades calculations.
      */
     async loadPredictorData(force = false) {
@@ -419,11 +444,24 @@ export class DashboardController {
             }
 
             if (data.success && coursesData.success) {
-                appState.currentYearWorkGrades = data.data;
-                appState.currentYearWorkCacheTime = data.updatedAt;
-
                 appState.cachedCurrentCourses = coursesData.data;
                 appState.currentCoursesCacheTime = coursesData.updatedAt;
+
+                if (data.data?.blockedByQuestionnaires) {
+                    await renderQuestionnaireBlock(
+                        'predictor-container',
+                        data.data.questionnaires || null,
+                        { onAllCompleted: () => this._handleQuestionnairesCompleted() }
+                    );
+                    this.hideLoader();
+                    if (activeTargetId === 'predictor-tab') {
+                        if (this.predictorTab) this.predictorTab.classList.remove('hidden');
+                    }
+                    return;
+                }
+
+                appState.currentYearWorkGrades = data.data;
+                appState.currentYearWorkCacheTime = data.updatedAt;
 
                 appState.cachedYearWorkData.set('', { data: data.data, updatedAt: data.updatedAt });
 
@@ -614,6 +652,19 @@ export class DashboardController {
             const data = await response.json();
 
             if (data.success) {
+                if (data.data?.blockedByQuestionnaires) {
+                    await renderQuestionnaireBlock(
+                        'grades-container',
+                        data.data.questionnaires || null,
+                        { onAllCompleted: () => this._handleQuestionnairesCompleted() }
+                    );
+                    this.hideLoader();
+                    if (activeTargetId === 'year-work-tab') {
+                        if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
+                    }
+                    return;
+                }
+
                 appState.cachedYearWorkData.set(yearId, { data: data.data, updatedAt: data.updatedAt });
 
                 renderYearWorkGrades(
@@ -733,6 +784,19 @@ export class DashboardController {
             const data = await response.json();
 
             if (data.success) {
+                if (data.data?.blockedByQuestionnaires) {
+                    await renderQuestionnaireBlock(
+                        'gpa-container',
+                        data.data.questionnaires || null,
+                        { onAllCompleted: () => this._handleQuestionnairesCompleted() }
+                    );
+                    this.hideLoader();
+                    if (activeTargetId === 'gpa-tab') {
+                        if (this.gpaTab) this.gpaTab.classList.remove('hidden');
+                    }
+                    return;
+                }
+
                 appState.cachedGPAData = data.data;
                 renderGPA(
                     'gpa-container',

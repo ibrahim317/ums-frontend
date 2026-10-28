@@ -179,3 +179,65 @@ export const fetchMyAccountInfo = async (force = false) => {
         return await fetch(url, { headers: getBrowserHeaders() });
     }
 };
+
+/**
+ * Fetches pending questionnaires list from /Questionnaires.
+ */
+export const fetchQuestionnaires = async () => {
+    if (isCapacitor) {
+        try {
+            const result = await umsService.getQuestionnaires();
+            return createFetchLikeResponse(200, true, result.data, null, result.updatedAt);
+        } catch (error) {
+            console.error('API Fetch Questionnaires Error:', error);
+            const errMsg = error?.message || 'فشل في جلب الاستبيانات.';
+            const isAuthError = errMsg.includes('credentials not found') || errMsg.includes('again');
+            return createFetchLikeResponse(isAuthError ? 401 : 500, false, null, errMsg);
+        }
+    } else {
+        return await fetch('/api/questionnaires', { headers: getBrowserHeaders() });
+    }
+};
+
+/**
+ * Fetches a specific questionnaire form structure.
+ */
+export const fetchQuestionnaireForm = async (urlOrId) => {
+    if (isCapacitor) {
+        try {
+            const result = await umsService.getQuestionnaireForm(urlOrId);
+            return createFetchLikeResponse(200, true, result.data, null, result.updatedAt);
+        } catch (error) {
+            console.error('API Fetch Questionnaire Form Error:', error);
+            const errMsg = error?.message || 'فشل في جلب تفاصيل الاستبيان.';
+            const isAuthError = errMsg.includes('credentials not found') || errMsg.includes('again');
+            return createFetchLikeResponse(isAuthError ? 401 : 500, false, null, errMsg);
+        }
+    } else {
+        const url = `/api/questionnaires/form?url=${encodeURIComponent(urlOrId)}`;
+        return await fetch(url, { headers: getBrowserHeaders() });
+    }
+};
+
+/**
+ * Submits questionnaire answers.
+ */
+export const submitQuestionnaireAPI = async (payload) => {
+    if (isCapacitor) {
+        try {
+            const result = await umsService.submitQuestionnaire(payload);
+            return createFetchLikeResponse(200, result.success, result.data, result.error);
+        } catch (error) {
+            console.error('API Submit Questionnaire Error:', error);
+            const errMsg = error?.message || 'فشل في إرسال الاستبيان.';
+            const isAuthError = errMsg.includes('credentials not found') || errMsg.includes('again');
+            return createFetchLikeResponse(isAuthError ? 401 : 500, false, null, errMsg);
+        }
+    } else {
+        return await fetch('/api/questionnaires/submit', {
+            method: 'POST',
+            headers: getBrowserHeaders(),
+            body: JSON.stringify(payload)
+        });
+    }
+};
