@@ -4,7 +4,7 @@
  */
 export class AppState {
     constructor() {
-        this.CURRENT_APP_VERSION = "1.2.2";
+        this.CURRENT_APP_VERSION = "1.2.3";
         this.clearAll();
     }
 

@@ -61,6 +61,9 @@ export class UmsParser {
 
         if (parsedData.terms.length === 0 && this._hasQuestionnaireBlockLink(doc)) {
             parsedData.blockedByQuestionnaires = true;
+        } else if (parsedData.terms.length === 0 && this._hasPaymentBlockLink(doc)) {
+            parsedData.blockedByPayment = true;
+            parsedData.paymentUrl = 'https://ums.asu.edu.eg/Home/Payment';
         }
 
         return parsedData;
@@ -219,6 +222,9 @@ export class UmsParser {
 
         if (parsedData.years.length === 0 && this._hasQuestionnaireBlockLink(doc)) {
             parsedData.blockedByQuestionnaires = true;
+        } else if (parsedData.years.length === 0 && this._hasPaymentBlockLink(doc)) {
+            parsedData.blockedByPayment = true;
+            parsedData.paymentUrl = 'https://ums.asu.edu.eg/Home/Payment';
         }
 
         return parsedData;
@@ -278,6 +284,26 @@ export class UmsParser {
         for (const a of anchors) {
             const href = (a.getAttribute('href') || '').trim();
             if (/^\/Questionnaires(\/|$|\?)/i.test(href) || /ums\.asu\.edu\.eg\/Questionnaires(\/|$|\?)/i.test(href)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if a document contains an unpaid fees block redirecting to /Home/Payment.
+     * @param {Document} doc 
+     * @returns {boolean}
+     */
+    _hasPaymentBlockLink(doc) {
+        const bodyText = (doc.body?.textContent || '').replace(/\s+/g, ' ');
+        if (bodyText.includes('مصاريف غير مسددة')) {
+            return true;
+        }
+        const anchors = doc.querySelectorAll('.ums-grades a[href], .ums-banner a[href], .ums-payment-block a[href], .app_service_item a[href], .job_listing_area a[href]');
+        for (const a of anchors) {
+            const href = (a.getAttribute('href') || '').trim();
+            if (/^\/Home\/Payment(\/|$|\?)/i.test(href) || /ums\.asu\.edu\.eg\/Home\/Payment(\/|$|\?)/i.test(href)) {
                 return true;
             }
         }

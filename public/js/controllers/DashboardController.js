@@ -3,7 +3,7 @@ import { appState } from '../services/AppState.js';
 import { renderYearWorkGrades, renderSummerBreak } from '../components/YearWorkRenderer.js';
 import { renderGPA } from '../components/GPARenderer.js';
 import { renderPredictor } from '../components/PredictorRenderer.js';
-import { renderQuestionnaireBlock } from '../components/QuestionnaireRenderer.js';
+import { renderQuestionnaireBlock, renderPaymentBlock } from '../components/QuestionnaireRenderer.js';
 
 /**
  * DashboardController - Orchestrates academic year selections, tab views,
@@ -286,7 +286,7 @@ export class DashboardController {
                 try {
                     const response = await fetchYearWorkGrades(year.Value, false);
                     const data = await response.json();
-                    if (data.success && !data.data?.blockedByQuestionnaires) {
+                    if (data.success && Array.isArray(data.data?.terms) && data.data.terms.length > 0) {
                         appState.cachedYearWorkData.set(year.Value, { data: data.data, updatedAt: data.updatedAt });
                         this.searchService.addYearWorkData(year.Text, data.data);
                     }
@@ -384,14 +384,37 @@ export class DashboardController {
     }
 
     /**
-     * Called when all blocking questionnaires have been completed.
-     * Clears blocked state and reloads grades and GPA from UMS.
+     * Renders a questionnaire or payment block banner inside containerId when blocked.
+     * When hasCachedData is true, the banner is prepended above the existing cached grades.
+     */
+    async _applyBlockBannerIfNeeded(containerId, payload, hasCachedData) {
+        if (!payload) return;
+        if (payload.blockedByQuestionnaires) {
+            await renderQuestionnaireBlock(
+                containerId,
+                payload.questionnaires || null,
+                {
+                    hasCachedData,
+                    onAllCompleted: () => this._handleQuestionnairesCompleted()
+                }
+            );
+        } else if (payload.blockedByPayment) {
+            renderPaymentBlock(
+                containerId,
+                payload.paymentUrl,
+                {
+                    hasCachedData,
+                    onRetry: () => this._handleQuestionnairesCompleted()
+                }
+            );
+        }
+    }
+
+    /**
+     * Called when blocking questionnaires have been completed or user retries after payment.
+     * Reloads grades and GPA from UMS, preserving existing cached data unless overwritten by new data.
      */
     async _handleQuestionnairesCompleted() {
-        appState.cachedGPAData = null;
-        appState.currentYearWorkGrades = null;
-        appState.cachedYearWorkData.clear();
-
         const selectedYear = this.yearSelect ? this.yearSelect.value : '';
         await Promise.allSettled([
             this.loadYearWorkGrades(selectedYear, true),
@@ -415,7 +438,9 @@ export class DashboardController {
         const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
 
         if (appState.currentYearWorkGrades && appState.cachedCurrentCourses && !force) {
+            const hasCachedTerms = Array.isArray(appState.currentYearWorkGrades?.terms) && appState.currentYearWorkGrades.terms.length > 0;
             renderPredictor('predictor-container', appState.currentYearWorkGrades, appState.cachedCurrentCourses);
+            await this._applyBlockBannerIfNeeded('predictor-container', appState.currentYearWorkGrades, hasCachedTerms);
             this.updateNavCacheInfo(appState.currentYearWorkCacheTime, () => this.loadPredictorData(true));
             if (activeTargetId === 'predictor-tab') {
                 if (this.predictorTab) this.predictorTab.classList.remove('hidden');
@@ -447,12 +472,15 @@ export class DashboardController {
                 appState.cachedCurrentCourses = coursesData.data;
                 appState.currentCoursesCacheTime = coursesData.updatedAt;
 
-                if (data.data?.blockedByQuestionnaires) {
-                    await renderQuestionnaireBlock(
-                        'predictor-container',
-                        data.data.questionnaires || null,
-                        { onAllCompleted: () => this._handleQuestionnairesCompleted() }
-                    );
+                if ((!Array.isArray(data.data?.terms) || data.data.terms.length === 0) && Array.isArray(appState.currentYearWorkGrades?.terms) && appState.currentYearWorkGrades.terms.length > 0) {
+                    data.data.terms = appState.currentYearWorkGrades.terms;
+                }
+
+                const hasCachedTerms = Array.isArray(data.data?.terms) && data.data.terms.length > 0;
+                const isBlocked = Boolean(data.data?.blockedByQuestionnaires || data.data?.blockedByPayment);
+
+                if (isBlocked && !hasCachedTerms) {
+                    await this._applyBlockBannerIfNeeded('predictor-container', data.data, false);
                     this.hideLoader();
                     if (activeTargetId === 'predictor-tab') {
                         if (this.predictorTab) this.predictorTab.classList.remove('hidden');
@@ -466,6 +494,7 @@ export class DashboardController {
                 appState.cachedYearWorkData.set('', { data: data.data, updatedAt: data.updatedAt });
 
                 renderPredictor('predictor-container', appState.currentYearWorkGrades, appState.cachedCurrentCourses);
+                await this._applyBlockBannerIfNeeded('predictor-container', appState.currentYearWorkGrades, hasCachedTerms);
 
                 if (this.yearSelect && !this.yearSelect.value) {
                     renderYearWorkGrades(
@@ -473,6 +502,7 @@ export class DashboardController {
                         data.data,
                         (name) => this.searchController.openSubjectByName(name)
                     );
+                    await this._applyBlockBannerIfNeeded('grades-container', data.data, hasCachedTerms);
                     appState.yearWorkCacheTime = data.updatedAt;
                 }
 
@@ -609,11 +639,13 @@ export class DashboardController {
 
         if (appState.cachedYearWorkData.has(yearId) && !force) {
             const cached = appState.cachedYearWorkData.get(yearId);
+            const hasCachedTerms = Array.isArray(cached.data?.terms) && cached.data.terms.length > 0;
             renderYearWorkGrades(
                 'grades-container',
                 cached.data,
                 (name) => this.searchController.openSubjectByName(name)
             );
+            await this._applyBlockBannerIfNeeded('grades-container', cached.data, hasCachedTerms);
             appState.yearWorkCacheTime = cached.updatedAt;
 
             if (yearId === '') {
@@ -621,6 +653,7 @@ export class DashboardController {
                 appState.currentYearWorkCacheTime = cached.updatedAt;
                 if (appState.cachedCurrentCourses) {
                     renderPredictor('predictor-container', appState.currentYearWorkGrades, appState.cachedCurrentCourses);
+                    await this._applyBlockBannerIfNeeded('predictor-container', appState.currentYearWorkGrades, hasCachedTerms);
                 }
 
                 let ywYearLabel = '';
@@ -652,12 +685,16 @@ export class DashboardController {
             const data = await response.json();
 
             if (data.success) {
-                if (data.data?.blockedByQuestionnaires) {
-                    await renderQuestionnaireBlock(
-                        'grades-container',
-                        data.data.questionnaires || null,
-                        { onAllCompleted: () => this._handleQuestionnairesCompleted() }
-                    );
+                const prevCached = appState.cachedYearWorkData.get(yearId);
+                if ((!Array.isArray(data.data?.terms) || data.data.terms.length === 0) && Array.isArray(prevCached?.data?.terms) && prevCached.data.terms.length > 0) {
+                    data.data.terms = prevCached.data.terms;
+                }
+
+                const hasCachedTerms = Array.isArray(data.data?.terms) && data.data.terms.length > 0;
+                const isBlocked = Boolean(data.data?.blockedByQuestionnaires || data.data?.blockedByPayment);
+
+                if (isBlocked && !hasCachedTerms) {
+                    await this._applyBlockBannerIfNeeded('grades-container', data.data, false);
                     this.hideLoader();
                     if (activeTargetId === 'year-work-tab') {
                         if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
@@ -672,12 +709,14 @@ export class DashboardController {
                     data.data,
                     (name) => this.searchController.openSubjectByName(name)
                 );
+                await this._applyBlockBannerIfNeeded('grades-container', data.data, hasCachedTerms);
 
                 if (yearId === '') {
                     appState.currentYearWorkGrades = data.data;
                     appState.currentYearWorkCacheTime = data.updatedAt;
                     if (appState.cachedCurrentCourses) {
                         renderPredictor('predictor-container', appState.currentYearWorkGrades, appState.cachedCurrentCourses);
+                        await this._applyBlockBannerIfNeeded('predictor-container', appState.currentYearWorkGrades, hasCachedTerms);
                     }
                 }
 
@@ -760,11 +799,13 @@ export class DashboardController {
         const activeTargetId = activeLink ? activeLink.getAttribute('data-target') : '';
 
         if (appState.cachedGPAData && !force) {
+            const hasCachedYears = Array.isArray(appState.cachedGPAData?.years) && appState.cachedGPAData.years.length > 0;
             renderGPA(
                 'gpa-container',
                 appState.cachedGPAData,
                 (name) => this.searchController.openSubjectByName(name)
             );
+            await this._applyBlockBannerIfNeeded('gpa-container', appState.cachedGPAData, hasCachedYears);
             this.searchService.setGPAData(appState.cachedGPAData);
             this.updateNavCacheInfo(appState.gpaCacheTime, () => this.loadGPA(true));
             if (activeTargetId === 'gpa-tab') {
@@ -784,12 +825,15 @@ export class DashboardController {
             const data = await response.json();
 
             if (data.success) {
-                if (data.data?.blockedByQuestionnaires) {
-                    await renderQuestionnaireBlock(
-                        'gpa-container',
-                        data.data.questionnaires || null,
-                        { onAllCompleted: () => this._handleQuestionnairesCompleted() }
-                    );
+                if ((!Array.isArray(data.data?.years) || data.data.years.length === 0) && Array.isArray(appState.cachedGPAData?.years) && appState.cachedGPAData.years.length > 0) {
+                    data.data.years = appState.cachedGPAData.years;
+                }
+
+                const hasCachedYears = Array.isArray(data.data?.years) && data.data.years.length > 0;
+                const isBlocked = Boolean(data.data?.blockedByQuestionnaires || data.data?.blockedByPayment);
+
+                if (isBlocked && !hasCachedYears) {
+                    await this._applyBlockBannerIfNeeded('gpa-container', data.data, false);
                     this.hideLoader();
                     if (activeTargetId === 'gpa-tab') {
                         if (this.gpaTab) this.gpaTab.classList.remove('hidden');
@@ -803,6 +847,7 @@ export class DashboardController {
                     data.data,
                     (name) => this.searchController.openSubjectByName(name)
                 );
+                await this._applyBlockBannerIfNeeded('gpa-container', data.data, hasCachedYears);
                 this.searchService.setGPAData(data.data);
                 appState.gpaCacheTime = data.updatedAt;
                 if (activeTargetId === 'gpa-tab') {

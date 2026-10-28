@@ -1,18 +1,35 @@
 import { fetchQuestionnaires, fetchQuestionnaireForm, submitQuestionnaireAPI } from '../api.js';
 
+const getBlockHost = (containerId, hasCachedData) => {
+    const parent = document.getElementById(containerId);
+    if (!parent) return null;
+    if (!hasCachedData) {
+        parent.innerHTML = '';
+        return parent;
+    }
+    const hostId = `${containerId}-block-host`;
+    let host = document.getElementById(hostId);
+    if (!host) {
+        host = document.createElement('div');
+        host.id = hostId;
+        host.style.marginBottom = '24px';
+        parent.prepend(host);
+    }
+    return host;
+};
+
 /**
  * Renders the blocked-by-questionnaires state inside a grades/GPA/predictor container,
  * allowing the user to view pending questionnaires from /Questionnaires and solve them inline.
  *
  * @param {string} containerId - Target DOM container ID
  * @param {Array|null} initialQuestionnaires - Pre-fetched list of questionnaires (optional)
- * @param {Object} options - { onAllCompleted: Function }
+ * @param {Object} options - { onAllCompleted: Function, hasCachedData: boolean }
  */
 export const renderQuestionnaireBlock = async (containerId, initialQuestionnaires = null, options = {}) => {
-    const container = document.getElementById(containerId);
+    const { onAllCompleted, hasCachedData = false } = options;
+    const container = getBlockHost(containerId, hasCachedData);
     if (!container) return;
-
-    const { onAllCompleted } = options;
 
     const renderListState = async (questionnairesList = null, statusBanner = null) => {
         container.innerHTML = '';
@@ -33,8 +50,10 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                     </svg>
                 </div>
                 <div class="questionnaire-alert-text">
-                    <h3>الدرجات محجوبة لحين استكمال الاستبيانات</h3>
-                    <p>يتطلب نظام UMS الرسمي حل جميع الاستبيانات التالية أولاً حتى يتم إظهار الدرجات والسجل الأكاديمي.</p>
+                    <h3>${hasCachedData ? 'تحديث الدرجات متوقف لحين استكمال الاستبيانات' : 'الدرجات محجوبة لحين استكمال الاستبيانات'}</h3>
+                    <p>${hasCachedData
+                        ? 'يتم عرض آخر بيانات محفوظة لديك بالأسفل. لتحديث الدرجات الجديدة من نظام UMS الرسمي، يتطلب النظام حل الاستبيانات التالية أولاً.'
+                        : 'يتطلب نظام UMS الرسمي حل جميع الاستبيانات التالية أولاً حتى يتم إظهار الدرجات والسجل الأكاديمي.'}</p>
                 </div>
             </div>
             <div class="questionnaire-alert-actions">
@@ -523,4 +542,73 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
     };
 
     await renderListState(initialQuestionnaires);
+};
+
+/**
+ * Renders the blocked-by-payment state inside a grades/GPA/predictor container,
+ * informing the student why grades are blocked and providing a direct link to the official UMS payment page.
+ *
+ * @param {string} containerId - Target DOM container ID
+ * @param {string} paymentUrl - Official UMS payment URL
+ * @param {Object} options - { onRetry: Function }
+ */
+export const renderPaymentBlock = (containerId, paymentUrl = 'https://ums.asu.edu.eg/Home/Payment', options = {}) => {
+    const { onRetry, hasCachedData = false } = options;
+    const container = getBlockHost(containerId, hasCachedData);
+    if (!container) return;
+
+    const targetUrl = paymentUrl || 'https://ums.asu.edu.eg/Home/Payment';
+
+    container.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'questionnaire-block-wrapper';
+
+    const banner = document.createElement('div');
+    banner.className = 'questionnaire-alert-card';
+    banner.innerHTML = `
+        <div class="questionnaire-alert-header">
+            <div class="questionnaire-alert-icon">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
+                    <line x1="1" y1="10" x2="23" y2="10"></line>
+                </svg>
+            </div>
+            <div class="questionnaire-alert-text">
+                <h3>${hasCachedData ? 'تحديث الدرجات متوقف لوجود مصاريف غير مسددة' : 'الدرجات محجوبة لوجود مصاريف غير مسددة'}</h3>
+                <p>${hasCachedData
+                    ? 'يتم عرض آخر بيانات محفوظة لديك بالأسفل. لتحديث الدرجات الجديدة من نظام UMS الرسمي، لديك مصاريف غير مسددة؛ يرجى التوجه إلى صفحة المدفوعات في الموقع الرسمي لسداد المبلغ، أو التوجه إلى شئون الطلاب لمزيد من المعلومات.'
+                    : 'لديك مصاريف غير مسددة في نظام UMS الرسمي تمنع إظهار الدرجات والسجل الأكاديمي. يرجى التوجه إلى صفحة المدفوعات في الموقع الرسمي لسداد المبلغ، أو التوجه إلى شئون الطلاب لمزيد من المعلومات.'}</p>
+            </div>
+        </div>
+        <div class="questionnaire-alert-actions" style="gap: 10px; flex-wrap: wrap;">
+            <a href="${targetUrl}" target="_blank" rel="noopener noreferrer" class="primary-btn sm-btn" style="text-decoration: none; display: inline-flex; align-items: center; gap: 8px; width: auto; padding: 10px 18px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                </svg>
+                <span>الذهاب لصفحة الدفع (UMS الرسمي)</span>
+            </a>
+            <button type="button" class="secondary-btn sm-btn" id="${containerId}-retry-payment-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                إعادة التحقق من الدرجات
+            </button>
+        </div>
+    `;
+
+    wrapper.appendChild(banner);
+    container.appendChild(wrapper);
+
+    const retryBtn = document.getElementById(`${containerId}-retry-payment-btn`);
+    if (retryBtn && typeof onRetry === 'function') {
+        retryBtn.addEventListener('click', async () => {
+            retryBtn.disabled = true;
+            await onRetry();
+        });
+    }
 };

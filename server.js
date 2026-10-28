@@ -171,26 +171,24 @@ app.get('/api/grades/year-work', authenticateToken, async (req, res) => {
     try {
         const force = req.query.force === 'true';
 
-        if (!force) {
-            let cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
-            
-            // Backward compatibility for Arabic
-            if (!cacheRecord && lang === 'ar') {
-                cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(oldCacheKey);
-                if (cacheRecord) {
-                    db.prepare('INSERT OR IGNORE INTO cache (cache_key, username, data, updated_at) VALUES (?, ?, ?, ?)').run(cacheKey, username, cacheRecord.data, cacheRecord.updated_at);
-                }
-            }
-
+        let cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
+        
+        // Backward compatibility for Arabic
+        if (!cacheRecord && lang === 'ar') {
+            cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(oldCacheKey);
             if (cacheRecord) {
-                const parsedCache = JSON.parse(cacheRecord.data);
-                const updatedAt = new Date(cacheRecord.updated_at + 'Z');
-                const diffSeconds = (new Date() - updatedAt) / 1000;
+                db.prepare('INSERT OR IGNORE INTO cache (cache_key, username, data, updated_at) VALUES (?, ?, ?, ?)').run(cacheKey, username, cacheRecord.data, cacheRecord.updated_at);
+            }
+        }
 
-                if (!parsedCache.blockedByQuestionnaires && diffSeconds < 300) { // 5 minutes TTL
-                    console.log(`Serving cached year work grades for ${cacheKey}`);
-                    return res.json({ success: true, data: parsedCache, cached: true, updatedAt: cacheRecord.updated_at });
-                }
+        if (!force && cacheRecord) {
+            const parsedCache = JSON.parse(cacheRecord.data);
+            const updatedAt = new Date(cacheRecord.updated_at + 'Z');
+            const diffSeconds = (new Date() - updatedAt) / 1000;
+
+            if (!parsedCache.blockedByQuestionnaires && !parsedCache.blockedByPayment && diffSeconds < 300) { // 5 minutes TTL
+                console.log(`Serving cached year work grades for ${cacheKey}`);
+                return res.json({ success: true, data: parsedCache, cached: true, updatedAt: cacheRecord.updated_at });
             }
         }
 
@@ -199,7 +197,16 @@ app.get('/api/grades/year-work', authenticateToken, async (req, res) => {
         const culturedCookies = getCulturedCookies(cookies, lang);
         const gradesData = await gradesService.fetchYearWorkGrades(culturedCookies, req.query.yearId);
 
-        if (gradesData.blockedByQuestionnaires) {
+        if (gradesData.blockedByQuestionnaires || gradesData.blockedByPayment) {
+            if (cacheRecord) {
+                try {
+                    const parsedCache = JSON.parse(cacheRecord.data);
+                    if (Array.isArray(parsedCache.terms) && parsedCache.terms.length > 0) {
+                        gradesData.terms = parsedCache.terms;
+                        return res.json({ success: true, data: gradesData, cached: true, updatedAt: cacheRecord.updated_at });
+                    }
+                } catch (e) {}
+            }
             return res.json({ success: true, data: gradesData, cached: false, updatedAt: new Date().toISOString() });
         }
 
@@ -250,26 +257,24 @@ app.get('/api/grades/gpa', authenticateToken, async (req, res) => {
     try {
         const force = req.query.force === 'true';
 
-        if (!force) {
-            let cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
-            
-            // Backward compatibility for Arabic
-            if (!cacheRecord && lang === 'ar') {
-                cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(oldCacheKey);
-                if (cacheRecord) {
-                    db.prepare('INSERT OR IGNORE INTO cache (cache_key, username, data, updated_at) VALUES (?, ?, ?, ?)').run(cacheKey, username, cacheRecord.data, cacheRecord.updated_at);
-                }
-            }
-
+        let cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
+        
+        // Backward compatibility for Arabic
+        if (!cacheRecord && lang === 'ar') {
+            cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(oldCacheKey);
             if (cacheRecord) {
-                const parsedCache = JSON.parse(cacheRecord.data);
-                const updatedAt = new Date(cacheRecord.updated_at + 'Z');
-                const diffSeconds = (new Date() - updatedAt) / 1000;
+                db.prepare('INSERT OR IGNORE INTO cache (cache_key, username, data, updated_at) VALUES (?, ?, ?, ?)').run(cacheKey, username, cacheRecord.data, cacheRecord.updated_at);
+            }
+        }
 
-                if (!parsedCache.blockedByQuestionnaires && diffSeconds < 60 * 60 * 24 * 30 * 6) { // 6 Months
-                    console.log(`Serving cached GPA for ${cacheKey}`);
-                    return res.json({ success: true, data: parsedCache, cached: true, updatedAt: cacheRecord.updated_at });
-                }
+        if (!force && cacheRecord) {
+            const parsedCache = JSON.parse(cacheRecord.data);
+            const updatedAt = new Date(cacheRecord.updated_at + 'Z');
+            const diffSeconds = (new Date() - updatedAt) / 1000;
+
+            if (!parsedCache.blockedByQuestionnaires && !parsedCache.blockedByPayment && diffSeconds < 60 * 60 * 24 * 30 * 6) { // 6 Months
+                console.log(`Serving cached GPA for ${cacheKey}`);
+                return res.json({ success: true, data: parsedCache, cached: true, updatedAt: cacheRecord.updated_at });
             }
         }
 
@@ -278,7 +283,16 @@ app.get('/api/grades/gpa', authenticateToken, async (req, res) => {
         const culturedCookies = getCulturedCookies(cookies, lang);
         const gpaData = await gradesService.fetchGPA(culturedCookies);
 
-        if (gpaData.blockedByQuestionnaires) {
+        if (gpaData.blockedByQuestionnaires || gpaData.blockedByPayment) {
+            if (cacheRecord) {
+                try {
+                    const parsedCache = JSON.parse(cacheRecord.data);
+                    if (Array.isArray(parsedCache.years) && parsedCache.years.length > 0) {
+                        gpaData.years = parsedCache.years;
+                        return res.json({ success: true, data: gpaData, cached: true, updatedAt: cacheRecord.updated_at });
+                    }
+                } catch (e) {}
+            }
             return res.json({ success: true, data: gpaData, cached: false, updatedAt: new Date().toISOString() });
         }
 
@@ -293,6 +307,23 @@ app.get('/api/grades/gpa', authenticateToken, async (req, res) => {
         res.json({ success: true, data: gpaData, cached: false, updatedAt: updatedRecord.updated_at });
     } catch (error) {
         console.error(`Error fetching GPA for ${username}:`, error.message);
+
+        let cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(cacheKey);
+        if (!cacheRecord && lang === 'ar') {
+            cacheRecord = db.prepare('SELECT data, updated_at FROM cache WHERE cache_key = ?').get(oldCacheKey);
+        }
+
+        if (cacheRecord) {
+            console.log(`Serving stale cached GPA for ${cacheKey} as fallback due to UMS error.`);
+            return res.json({
+                success: true,
+                data: JSON.parse(cacheRecord.data),
+                cached: true,
+                fallback: true,
+                updatedAt: cacheRecord.updated_at
+            });
+        }
+
         res.status(500).json({ success: false, error: error.message || 'Failed to retrieve GPA.' });
     }
 });

@@ -232,7 +232,7 @@ export class UmsService {
         const cacheKey = this._cacheKey(`cache_yearwork_${yearId || 'default'}`);
         if (!force) {
             const cached = this.storage.getCache(cacheKey, 5 * 60 * 1000);
-            if (cached && !cached.data?.blockedByQuestionnaires) {
+            if (cached && !cached.data?.blockedByQuestionnaires && !cached.data?.blockedByPayment) {
                 return { success: true, data: cached.data, cached: true, updatedAt: cached.updatedAt };
             }
         }
@@ -273,13 +273,20 @@ export class UmsService {
             const htmlText = await response.text();
             const parsed = this.parser.parseYearWorkGrades(htmlText);
 
-            if (parsed.blockedByQuestionnaires) {
-                try {
-                    const qRes = await this.getQuestionnaires();
-                    parsed.questionnaires = qRes.data?.questionnaires || [];
-                } catch (e) {
-                    console.warn('Failed to auto-fetch questionnaires on blocked year work:', e);
-                    parsed.questionnaires = [];
+            if (parsed.blockedByQuestionnaires || parsed.blockedByPayment) {
+                if (parsed.blockedByQuestionnaires) {
+                    try {
+                        const qRes = await this.getQuestionnaires();
+                        parsed.questionnaires = qRes.data?.questionnaires || [];
+                    } catch (e) {
+                        console.warn('Failed to auto-fetch questionnaires on blocked year work:', e);
+                        parsed.questionnaires = [];
+                    }
+                }
+                const stale = this.storage.getJson(cacheKey);
+                if (stale && Array.isArray(stale.data?.terms) && stale.data.terms.length > 0) {
+                    parsed.terms = stale.data.terms;
+                    return { success: true, data: parsed, cached: true, updatedAt: stale.updatedAt };
                 }
                 return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
             }
@@ -313,40 +320,57 @@ export class UmsService {
         const cacheKey = this._cacheKey('cache_gpa');
         if (!force) {
             const cached = this.storage.getCache(cacheKey, 6 * 30 * 24 * 60 * 60 * 1000);
-            if (cached && !cached.data?.blockedByQuestionnaires) {
+            if (cached && !cached.data?.blockedByQuestionnaires && !cached.data?.blockedByPayment) {
                 return { success: true, data: cached.data, cached: true, updatedAt: cached.updatedAt };
             }
         }
 
-        const cookies = await this.getValidCookies();
-        const response = await this.http.request({
-            url: 'https://ums.asu.edu.eg/StudentGrades',
-            method: 'GET',
-            headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Referer': 'https://ums.asu.edu.eg/YearWorkGradesForStudent/StudentYearWorkGrades',
-                'Cookie': this._withCulture(cookies)
-            }
-        });
+        try {
+            const cookies = await this.getValidCookies();
+            const response = await this.http.request({
+                url: 'https://ums.asu.edu.eg/StudentGrades',
+                method: 'GET',
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Referer': 'https://ums.asu.edu.eg/YearWorkGradesForStudent/StudentYearWorkGrades',
+                    'Cookie': this._withCulture(cookies)
+                }
+            });
 
-        const htmlText = await response.text();
-        const parsed = this.parser.parseGPA(htmlText);
+            const htmlText = await response.text();
+            const parsed = this.parser.parseGPA(htmlText);
 
-        if (parsed.blockedByQuestionnaires) {
-            try {
-                const qRes = await this.getQuestionnaires();
-                parsed.questionnaires = qRes.data?.questionnaires || [];
-            } catch (e) {
-                console.warn('Failed to auto-fetch questionnaires on blocked GPA:', e);
-                parsed.questionnaires = [];
+            if (parsed.blockedByQuestionnaires || parsed.blockedByPayment) {
+                if (parsed.blockedByQuestionnaires) {
+                    try {
+                        const qRes = await this.getQuestionnaires();
+                        parsed.questionnaires = qRes.data?.questionnaires || [];
+                    } catch (e) {
+                        console.warn('Failed to auto-fetch questionnaires on blocked GPA:', e);
+                        parsed.questionnaires = [];
+                    }
+                }
+                const stale = this.storage.getJson(cacheKey);
+                if (stale && Array.isArray(stale.data?.years) && stale.data.years.length > 0) {
+                    parsed.years = stale.data.years;
+                    return { success: true, data: parsed, cached: true, updatedAt: stale.updatedAt };
+                }
+                return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
             }
+
+            this.storage.setCache(cacheKey, parsed);
+
             return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
+        } catch (error) {
+            console.error('Error in UmsService.getGPA:', error);
+            const cached = this.storage.getJson(cacheKey);
+            if (cached) {
+                console.log(`Serving stale cached GPA for ${cacheKey} in UmsService as fallback.`);
+                return { success: true, data: cached.data, cached: true, fallback: true, updatedAt: cached.updatedAt };
+            }
+            throw error;
         }
-
-        this.storage.setCache(cacheKey, parsed);
-
-        return { success: true, data: parsed, cached: false, updatedAt: new Date().toISOString() };
     }
 
     /**

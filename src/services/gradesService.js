@@ -13,6 +13,22 @@ const hasQuestionnaireBlockLink = ($) => {
     return blocked;
 };
 
+const hasPaymentBlockLink = ($) => {
+    const bodyText = $.root().text().replace(/\s+/g, ' ');
+    if (bodyText.includes('مصاريف غير مسددة')) {
+        return true;
+    }
+    let blocked = false;
+    $('.ums-grades a[href], .ums-banner a[href], .ums-payment-block a[href], .app_service_item a[href], .job_listing_area a[href]').each((i, el) => {
+        const href = ($(el).attr('href') || '').trim();
+        if (/^\/Home\/Payment(\/|$|\?)/i.test(href) || /ums\.asu\.edu\.eg\/Home\/Payment(\/|$|\?)/i.test(href)) {
+            blocked = true;
+            return false;
+        }
+    });
+    return blocked;
+};
+
 const parseQuestionnairesHtml = (html) => {
     const $ = cheerio.load(html);
     const questionnaires = [];
@@ -340,6 +356,9 @@ const fetchYearWorkGrades = async (cookies, yearId) => {
             console.warn('Failed to auto-fetch questionnaires on blocked year work:', err.message);
             parsedData.questionnaires = [];
         }
+    } else if (parsedData.terms.length === 0 && hasPaymentBlockLink($)) {
+        parsedData.blockedByPayment = true;
+        parsedData.paymentUrl = 'https://ums.asu.edu.eg/Home/Payment';
     }
 
     return parsedData;
@@ -483,6 +502,9 @@ const fetchGPA = async (cookies) => {
             console.warn('Failed to auto-fetch questionnaires on blocked GPA:', err.message);
             parsedData.questionnaires = [];
         }
+    } else if (parsedData.years.length === 0 && hasPaymentBlockLink($)) {
+        parsedData.blockedByPayment = true;
+        parsedData.paymentUrl = 'https://ums.asu.edu.eg/Home/Payment';
     }
 
     return parsedData;
@@ -552,5 +574,6 @@ module.exports = {
     submitQuestionnaire,
     parseQuestionnairesHtml,
     parseQuestionnaireFormHtml,
-    hasQuestionnaireBlockLink
+    hasQuestionnaireBlockLink,
+    hasPaymentBlockLink
 };
