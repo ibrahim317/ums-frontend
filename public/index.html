@@ -301,6 +301,10 @@
                                                 </div>
                                             </div>
                                         </li>
+                                        <li style="align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--border-color); padding-top: 12px; margin-top: 8px;">
+                                            <span class="grade-label" style="margin-bottom: 0;">سجل التحديثات وما الجديد:</span>
+                                            <button id="open-release-notes-btn" class="secondary-btn" style="padding: 6px 12px; font-size: 0.85rem; margin: 0; min-height: unset; height: 32px; line-height: 20px;">عرض سجل التحديثات</button>
+                                        </li>
                                     </ul>
                                 </div>
                             </div>
@@ -328,6 +332,190 @@
                                     </path>
                                 </svg>
                             </a>
+                        </div>
+                    </div>
+
+                    <!-- Release Notes View (Accessible from Settings) -->
+                    <div id="release-notes-tab" class="tab-content hidden">
+                        <div class="release-notes-header-card subject-card">
+                            <div class="release-notes-header-top">
+                                <div>
+                                    <h2 class="release-notes-main-title">سجل التحديثات وما الجديد</h2>
+                                    <p class="release-notes-subtitle">ملخص مبسط لكل المميزات والتحسينات التي تمت إضافتها في كل إصدار</p>
+                                </div>
+                                <button type="button" id="back-to-settings-btn" class="secondary-btn sm-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                                        <polyline points="12 5 19 12 12 19"></polyline>
+                                    </svg>
+                                    العودة إلى الإعدادات
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="release-notes-timeline">
+                            <!-- v1.2.4 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge current-version">v1.2.4</span>
+                                        <h2>دعم كامل لاستبيانات المقررات والهيئة المعاونة</h2>
+                                    </div>
+                                    <span class="release-status-tag">الإصدار الحالي</span>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>إضافة قائمة اختيار المعيد أو المدرس المساعد داخل استبيانات المقررات لتتمكن من اختيار المعيد وتقييمه بسهولة كما في الموقع الرسمي.</li>
+                                        <li>دعم المقررات التي يقوم بتدريسها أكثر من دكتور، مع عرض اسم كل دكتور بوضوح وإمكانية تحديد التقييم لكل دكتور بنقرة واحدة.</li>
+                                        <li>حل مشكلة عدم القدرة على إرسال بعض استبيانات المقررات في تطبيق الموبايل.</li>
+                                        <li>إضافة صفحة "سجل التحديثات" في الإعدادات لمتابعة المميزات الجديدة في كل إصدار.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- v1.2.3 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge">v1.2.3</span>
+                                        <h2>تنبيه المصروفات الدراسية والحفاظ على درجاتك المحفوظة</h2>
+                                    </div>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>الاحتفاظ بجميع درجاتك وسجلك الأكاديمي المحفوظ على جهازك لتتمكن من تصفحها وحساب معدلك حتى لو قام موقع الجامعة بحجب الدرجات بسبب الاستبيانات أو المصروفات.</li>
+                                        <li>إضافة تنبيه واضح عند حجب الدرجات بسبب عدم سداد المصروفات الدراسية، مع زر مباشر للانتقال لصفحة الدفع في موقع الجامعة الرسمي.</li>
+                                        <li>إصلاح مشكلة تشغيل نسخة Linux على توزيعات Ubuntu المختلفة.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- v1.2.2 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge">v1.2.2</span>
+                                        <h2>حل الاستبيانات من داخل التطبيق وتصحيح نقاط التوقعات</h2>
+                                    </div>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>إمكانية حل جميع استبيانات الجامعة الإجبارية مباشرة من داخل التطبيق دون الحاجة لفتح موقع الجامعة، مع ميزة "تحديد الكل بنقرة واحدة" لتوفير الوقت.</li>
+                                        <li>تصحيح مقياس نقاط التقديرات (مثل B و B-) في شاشة توقعات التقدير الفصلي لتكون الحسابات مطابقة تماماً للائحة الكلية.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- v1.2.1 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge">v1.2.1</span>
+                                        <h2>تحسين الإحصائيات والرسوم البيانية</h2>
+                                    </div>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>إصلاح حساب عدد مرات التدريب الصيفي عند استخدام اللغة الإنجليزية.</li>
+                                        <li>تحسين الرسم البياني لتوزيع التقديرات ليشمل كافة التقديرات الفرعية (مثل A+ و A و A-) ومواد الرسوب بشكل أوضح ومرتب من الأعلى للأقل.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- v1.2.0 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge">v1.2.0</span>
+                                        <h2>العمل بدون اتصال عند توقف موقع الجامعة</h2>
+                                    </div>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>إمكانية تصفح درجاتك وسجلك الأكاديمي المحفوظ حتى عندما يكون موقع نظام UMS الرسمي متوقفاً أو واقعاً.</li>
+                                        <li>تحديث طريقة قراءة السجل الأكاديمي لتتوافق مع التصميم الجديد لموقع الجامعة.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- v1.1.0 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge">v1.1.0</span>
+                                        <h2>الوضع الليلي، الإحصائيات، وتوقع التقديرات</h2>
+                                    </div>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>إضافة الوضع الليلي (Dark Mode) لراحة العين.</li>
+                                        <li>إضافة صفحة "توقع التقدير" لحساب التقدير المتوقع والدرجات المطلوبة في الامتحان النهائي لمواد الفصل الدراسي الحالي.</li>
+                                        <li>إضافة صفحة "الإحصائيات" لعرض تطور المعدل التراكمي، الساعات المنجزة، وتوزيع التقديرات.</li>
+                                        <li>تسريع فتح التطبيق وتحميل البيانات بشكل متوازٍ مع شريط تقدم واضح.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- v1.0.3 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge">v1.0.3</span>
+                                        <h2>دقة حساب الساعات المنجزة وتفاصيل الفصول</h2>
+                                    </div>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>عرض المعدل الفصلي وعدد الساعات لكل فصل دراسي على حدة.</li>
+                                        <li>تحسين دقة حساب إجمالي الساعات المعتمدة المنجزة.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- v1.0.2 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge">v1.0.2</span>
+                                        <h2>تحسين حساب المعدل التراكمي (CGPA)</h2>
+                                    </div>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>إصلاح وتحسين دقة حساب المعدل التراكمي الإجمالي بناءً على تقديرات المواد.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- v1.0.1 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge">v1.0.1</span>
+                                        <h2>إطلاق تطبيق الموبايل للأندرويد</h2>
+                                    </div>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>توفير تطبيق الأندرويد متصلاً مباشرة بنظام UMS مع حفظ البيانات على الجهاز وميزة البحث السريع في جميع المواد.</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- v1.0.0 -->
+                            <div class="term-section release-note-card">
+                                <div class="term-header release-note-header">
+                                    <div class="release-note-title-wrap">
+                                        <span class="term-badge release-version-badge">v1.0.0</span>
+                                        <h2>الإصدار الأول لسطح المكتب</h2>
+                                    </div>
+                                </div>
+                                <div class="release-note-body">
+                                    <ul class="release-note-list">
+                                        <li>الإطلاق الأول للتطبيق على نظامي Windows و Linux لعرض درجات أعمال السنة والتقديرات التراكمية بشكل سريع ومنظم.</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -28,6 +28,7 @@ export class DashboardController {
         this.predictorTab = document.getElementById('predictor-tab');
         this.analyticsTab = document.getElementById('analytics-tab');
         this.settingsTab = document.getElementById('settings-tab');
+        this.releaseNotesTab = document.getElementById('release-notes-tab');
         this.appWebVersionSpan = document.getElementById('app-web-version');
         this.pageTitle = document.getElementById('page-title');
 
@@ -89,6 +90,20 @@ export class DashboardController {
         if (checkUpdateBtn) {
             checkUpdateBtn.addEventListener('click', () => {
                 this.updaterService.checkUpdates(true);
+            });
+        }
+
+        const openReleaseNotesBtn = document.getElementById('open-release-notes-btn');
+        if (openReleaseNotesBtn) {
+            openReleaseNotesBtn.addEventListener('click', () => {
+                this.switchTab('release-notes-tab');
+            });
+        }
+
+        const backToSettingsBtn = document.getElementById('back-to-settings-btn');
+        if (backToSettingsBtn) {
+            backToSettingsBtn.addEventListener('click', () => {
+                this.switchTab('settings-tab');
             });
         }
 
@@ -972,6 +987,7 @@ export class DashboardController {
         if (this.predictorTab) this.predictorTab.classList.add('hidden');
         if (this.analyticsTab) this.analyticsTab.classList.add('hidden');
         if (this.settingsTab) this.settingsTab.classList.add('hidden');
+        if (this.releaseNotesTab) this.releaseNotesTab.classList.add('hidden');
 
         if (targetId === 'year-work-tab') {
             const container = document.getElementById('grades-container');
@@ -997,6 +1013,14 @@ export class DashboardController {
             this.hideNavCacheInfo();
             await this.loadSettings();
             if (this.settingsTab) this.settingsTab.classList.remove('hidden');
+        } else if (targetId === 'release-notes-tab') {
+            this.hideNavCacheInfo();
+            if (this.settingsTabBtn) this.settingsTabBtn.classList.add('active');
+            if (this.pageTitle) this.pageTitle.textContent = 'سجل التحديثات';
+            if (this.releaseNotesTab) {
+                this.releaseNotesTab.classList.remove('hidden');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
         }
     }
 }
