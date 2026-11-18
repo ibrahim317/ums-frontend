@@ -82,14 +82,38 @@ const fetchQuestionnaires = async (cookies) => {
 
 const parseAddToAnswersAttr = (onchangeStr) => {
     if (!onchangeStr) return null;
-    const m = onchangeStr.match(/AddToAnswers\(\s*(\d+)\s*,\s*(\d+)\s*,\s*this\.value\s*(?:,\s*([^,\s)]+))?\s*(?:,\s*([^,\s)]+))?\s*,?\s*\)/);
+    const m = onchangeStr.match(/AddToAnswers\(\s*(\d+)\s*,\s*(\d+)\s*,\s*this\.value\s*(?:,\s*([^,)]+))?\s*(?:,\s*(.+?))?\s*\)\s*;?\s*$/);
     if (!m) return null;
-    const parseNullable = (val) => (!val || val === 'null' || val === 'undefined') ? null : (isNaN(Number(val)) ? val : Number(val));
+    const parseNullable = (val) => {
+        if (!val) return null;
+        const trimmed = val.trim().replace(/,\s*$/, '');
+        if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null;
+        return isNaN(Number(trimmed)) ? trimmed : Number(trimmed);
+    };
+    const rawInstructor = parseNullable(m[3]);
+    const rawTaExpr = (m[4] || '').trim().replace(/,\s*$/, '');
+    let taId = null;
+    let usesTaDropdown = false;
+
+    if (rawTaExpr) {
+        const condMatch = rawTaExpr.match(/(\d+)\s*>\s*0\s*\?/);
+        if (condMatch) {
+            usesTaDropdown = parseInt(condMatch[1], 10) > 0;
+            taId = null;
+        } else if (rawTaExpr.includes('#TA')) {
+            usesTaDropdown = true;
+            taId = null;
+        } else {
+            taId = parseNullable(rawTaExpr);
+        }
+    }
+
     return {
         questionId: Number(m[1]),
         answerType: Number(m[2]),
-        instructorId: parseNullable(m[3]),
-        taId: parseNullable(m[4])
+        instructorId: typeof rawInstructor === 'number' ? rawInstructor : null,
+        taId: typeof taId === 'number' ? taId : null,
+        usesTaDropdown
     };
 };
 
@@ -115,6 +139,29 @@ const parseQuestionnaireFormHtml = (html, fallbackId = null) => {
     const mandatoryMatch = scriptText.match(/mandatoryQuestionIds\s*=\s*\[([\d,\s]*)\]/);
     const advisorMatch = scriptText.match(/var\s+advisor\s*=\s*(\{[\s\S]*?\}|null)\s*;/);
     const advisorActiveMatch = scriptText.match(/var\s+AdvisorId\s*=\s*(\d+)\s*==\s*2/);
+    const taAssignMatch = scriptText.match(/GetCourseTa\s*\(\s*\)\s*\{[\s\S]*?AssignIds\s*:\s*JSON\.stringify\(\s*(\[[\d,\s]*\])\s*\)/);
+
+    let taAssignIds = [];
+    if (taAssignMatch && taAssignMatch[1]) {
+        try {
+            const parsedIds = JSON.parse(taAssignMatch[1]);
+            if (Array.isArray(parsedIds)) {
+                taAssignIds = parsedIds.filter(n => typeof n === 'number' && !isNaN(n));
+            }
+        } catch (e) {}
+    }
+
+    // Fallback static TA options from #TA_listbox if already rendered in HTML
+    const uniqueTaIds = Array.from(new Set(taAssignIds));
+    const domTaOptions = [];
+    $('#TA_listbox li').each((idx, liEl) => {
+        const label = $(liEl).text().replace(/\s+/g, ' ').trim();
+        if (!label) return;
+        const val = $(liEl).attr('data-value') || (uniqueTaIds[idx] != null ? String(uniqueTaIds[idx]) : '');
+        if (val) {
+            domTaOptions.push({ value: String(val), label });
+        }
+    });
 
     let academicAdvisorId = null;
     if (advisorMatch && advisorMatch[1] && advisorMatch[1] !== 'null') {
@@ -139,9 +186,36 @@ const parseQuestionnaireFormHtml = (html, fallbackId = null) => {
         const sectionTitle = $(cardEl).find('.section-header').first().text().replace(/\s+/g, ' ').trim() || `القسم ${sIdx + 1}`;
         const questions = [];
 
+        const taInputEl = $(cardEl).find('input#TA, input[name="TA"]').first();
+        let hasTaSelector = taInputEl.length > 0 && taAssignIds.length > 0;
+        let taSelectorLabel = 'اسم عضو الهيئة المعاونة';
+        let taSelectorNote = '';
+
+        if (taInputEl.length > 0) {
+            const formGroup = taInputEl.closest('.form-group');
+            const ctrlLabel = formGroup.find('.control-label, label').first().text().replace(/\s+/g, ' ').trim();
+            if (ctrlLabel) taSelectorLabel = ctrlLabel;
+            const prevP = formGroup.prev('p').text().replace(/\s+/g, ' ').trim();
+            if (prevP) taSelectorNote = prevP;
+        }
+
         $(cardEl).find('.question-label').each((qIdx, qLabelEl) => {
             const qText = $(qLabelEl).text().replace(/\s+/g, ' ').trim();
             const hasMandatoryIcon = $(qLabelEl).find('.mandatory_icon').length > 0;
+
+            // Detect preceding instructor label (e.g. <label class="mb-4 mt-3 d-block"><i class="fa-solid fa-person ..."></i> Name</label>)
+            let instructorName = null;
+            let prevEl = $(qLabelEl).prev();
+            while (prevEl.length) {
+                if (prevEl.is('label') && !prevEl.hasClass('question-label') && !prevEl.hasClass('section-header') && !prevEl.hasClass('answer-label') && !prevEl.hasClass('control-label')) {
+                    const candidate = prevEl.text().replace(/\s+/g, ' ').trim();
+                    if (candidate) {
+                        instructorName = candidate;
+                        break;
+                    }
+                }
+                prevEl = prevEl.prev();
+            }
 
             let questionMeta = null;
             let inputType = 'radio';
@@ -149,7 +223,14 @@ const parseQuestionnaireFormHtml = (html, fallbackId = null) => {
             let note = '';
 
             let sib = $(qLabelEl).next();
-            while (sib.length && !sib.hasClass('question-label') && !sib.hasClass('section-header')) {
+            while (
+                sib.length &&
+                !sib.hasClass('question-label') &&
+                !sib.hasClass('section-header') &&
+                !sib.is('hr') &&
+                !sib.is('label') &&
+                !sib.hasClass('form-group')
+            ) {
                 const formChecks = sib.hasClass('form-check') ? sib : sib.find('.form-check');
                 formChecks.each((j, fc) => {
                     const inp = $(fc).find('input').first();
@@ -180,9 +261,13 @@ const parseQuestionnaireFormHtml = (html, fallbackId = null) => {
             }
 
             if (questionMeta) {
+                if (questionMeta.usesTaDropdown && taAssignIds.length > 0) {
+                    hasTaSelector = true;
+                }
                 const isMandatory = hasMandatoryIcon || mandatorySet.has(questionMeta.questionId);
                 questions.push({
                     ...questionMeta,
+                    instructorName,
                     text: qText,
                     mandatory: isMandatory,
                     inputType,
@@ -197,6 +282,10 @@ const parseQuestionnaireFormHtml = (html, fallbackId = null) => {
             sections.push({
                 title: sectionTitle,
                 isEvaluationSection,
+                hasTaSelector,
+                taSelectorLabel: hasTaSelector ? taSelectorLabel : null,
+                taSelectorNote: hasTaSelector ? taSelectorNote : null,
+                taOptions: hasTaSelector ? domTaOptions : [],
                 questions
             });
         }
@@ -209,8 +298,42 @@ const parseQuestionnaireFormHtml = (html, fallbackId = null) => {
         academicAdvisorId,
         requestVerificationToken,
         mandatoryQuestionIds,
+        taAssignIds,
+        taOptions: domTaOptions,
         sections
     };
+};
+
+const fetchCourseTAs = async (cookies, taAssignIds, refererUrl) => {
+    if (!Array.isArray(taAssignIds) || taAssignIds.length === 0) return [];
+    const assignJson = JSON.stringify(taAssignIds);
+    const url = `https://ums.asu.edu.eg/Questionnaires/GetInstructorCourseTAs?AssignIds=${encodeURIComponent(assignJson)}`;
+    const response = await axios.get(url, {
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+            'Accept': 'application/json, text/javascript, */*; q=0.01',
+            'Referer': refererUrl || 'https://ums.asu.edu.eg/Questionnaires',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Cookie': cookies
+        }
+    });
+
+    const data = response.data;
+    const rawList = Array.isArray(data)
+        ? data
+        : (Array.isArray(data?.Data) ? data.Data : (Array.isArray(data?.data) ? data.data : []));
+
+    const seen = new Set();
+    const options = [];
+    for (const item of rawList) {
+        if (!item) continue;
+        const value = String(item.Id ?? item.id ?? item.Value ?? '').trim();
+        const label = String(item.Name ?? item.name ?? item.Text ?? '').replace(/\s+/g, ' ').trim();
+        if (!value || !label || seen.has(value)) continue;
+        seen.add(value);
+        options.push({ value, label });
+    }
+    return options;
 };
 
 const fetchQuestionnaireForm = async (cookies, urlOrId) => {
@@ -234,6 +357,23 @@ const fetchQuestionnaireForm = async (cookies, urlOrId) => {
     });
 
     const form = parseQuestionnaireFormHtml(response.data, fallbackId);
+
+    if (Array.isArray(form.taAssignIds) && form.taAssignIds.length > 0) {
+        try {
+            const fetchedTaOptions = await fetchCourseTAs(cookies, form.taAssignIds, fullUrl);
+            if (fetchedTaOptions.length > 0) {
+                form.taOptions = fetchedTaOptions;
+                form.sections.forEach((sec) => {
+                    if (sec.hasTaSelector) {
+                        sec.taOptions = fetchedTaOptions;
+                    }
+                });
+            }
+        } catch (err) {
+            console.warn('Failed to fetch course TAs for questionnaire:', err.message);
+        }
+    }
+
     return {
         form,
         setCookieHeader: response.headers['set-cookie'] || null
@@ -256,13 +396,17 @@ const submitQuestionnaire = async (cookies, payload) => {
     params.append('AcademicAdvisorId', academicAdvisorId != null ? String(academicAdvisorId) : '');
     params.append('__RequestVerificationToken', requestVerificationToken || '');
 
+    const refererUrl = Number(courseId) > 0
+        ? `https://ums.asu.edu.eg/Questionnaires/solveQuestionnaire/${questionnaireId}?courseId=${courseId}`
+        : `https://ums.asu.edu.eg/Questionnaires/solveQuestionnaire/${questionnaireId}`;
+
     const response = await axios.post('https://ums.asu.edu.eg/Questionnaires/SaveAnswer', params.toString(), {
         headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
             'Accept': 'application/json, text/javascript, */*; q=0.01',
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
             'Origin': 'https://ums.asu.edu.eg',
-            'Referer': `https://ums.asu.edu.eg/Questionnaires/solveQuestionnaire/${questionnaireId}`,
+            'Referer': refererUrl,
             'X-Requested-With': 'XMLHttpRequest',
             'Cookie': cookies
         }

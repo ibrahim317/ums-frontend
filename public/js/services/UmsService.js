@@ -489,6 +489,49 @@ export class UmsService {
 
         const htmlText = await response.text();
         const parsed = this.parser.parseQuestionnaireForm(htmlText, fallbackId);
+
+        if (Array.isArray(parsed.taAssignIds) && parsed.taAssignIds.length > 0) {
+            try {
+                const assignJson = JSON.stringify(parsed.taAssignIds);
+                const taUrl = `https://ums.asu.edu.eg/Questionnaires/GetInstructorCourseTAs?AssignIds=${encodeURIComponent(assignJson)}`;
+                const taRes = await this.http.request({
+                    url: taUrl,
+                    method: 'GET',
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:151.0) Gecko/20100101 Firefox/151.0',
+                        'Accept': 'application/json, text/javascript, */*; q=0.01',
+                        'Referer': `https://ums.asu.edu.eg${pathUrl}`,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Cookie': this._withCulture(this.activeCookies || cookies)
+                    }
+                });
+                const taData = await taRes.json();
+                const rawList = Array.isArray(taData)
+                    ? taData
+                    : (Array.isArray(taData?.Data) ? taData.Data : (Array.isArray(taData?.data) ? taData.data : []));
+                const seen = new Set();
+                const fetchedTaOptions = [];
+                for (const item of rawList) {
+                    if (!item) continue;
+                    const value = String(item.Id ?? item.id ?? item.Value ?? '').trim();
+                    const label = String(item.Name ?? item.name ?? item.Text ?? '').replace(/\s+/g, ' ').trim();
+                    if (!value || !label || seen.has(value)) continue;
+                    seen.add(value);
+                    fetchedTaOptions.push({ value, label });
+                }
+                if (fetchedTaOptions.length > 0) {
+                    parsed.taOptions = fetchedTaOptions;
+                    parsed.sections.forEach((sec) => {
+                        if (sec.hasTaSelector) {
+                            sec.taOptions = fetchedTaOptions;
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn('Failed to fetch course TAs for questionnaire in UmsService:', e);
+            }
+        }
+
         return { success: true, data: parsed, updatedAt: new Date().toISOString() };
     }
 
@@ -512,6 +555,10 @@ export class UmsService {
         params.append('AcademicAdvisorId', academicAdvisorId != null ? String(academicAdvisorId) : '');
         params.append('__RequestVerificationToken', requestVerificationToken || '');
 
+        const refererUrl = Number(courseId) > 0
+            ? `https://ums.asu.edu.eg/Questionnaires/solveQuestionnaire/${questionnaireId}?courseId=${courseId}`
+            : `https://ums.asu.edu.eg/Questionnaires/solveQuestionnaire/${questionnaireId}`;
+
         const response = await this.http.request({
             url: 'https://ums.asu.edu.eg/Questionnaires/SaveAnswer',
             method: 'POST',
@@ -520,7 +567,7 @@ export class UmsService {
                 'Accept': 'application/json, text/javascript, */*; q=0.01',
                 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                 'Origin': 'https://ums.asu.edu.eg',
-                'Referer': `https://ums.asu.edu.eg/Questionnaires/solveQuestionnaire/${questionnaireId}`,
+                'Referer': refererUrl,
                 'X-Requested-With': 'XMLHttpRequest',
                 'Cookie': this._withCulture(cookies)
             },

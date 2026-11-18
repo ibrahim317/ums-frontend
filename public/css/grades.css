@@ -554,3 +554,80 @@
     padding: 18px;
     border-radius: 8px;
 }
+
+.questionnaire-instructor-banner {
+    background: var(--panel-bg);
+    border: 1px solid var(--border-color);
+    border-right: 4px solid var(--accent-color, #3b82f6);
+    border-radius: 8px;
+    padding: 12px 16px;
+    margin-top: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.instructor-banner-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-primary);
+    font-size: 0.98rem;
+}
+
+.instructor-banner-info svg {
+    color: var(--accent-color, #3b82f6);
+    flex-shrink: 0;
+}
+
+.instructor-quick-rate {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.instructor-quick-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.sm-pill-btn {
+    min-width: 36px;
+    height: 32px;
+    padding: 0 10px;
+    font-size: 0.85rem;
+}
+
+.questionnaire-ta-select-card {
+    border-right: 4px solid var(--accent-color, #3b82f6);
+}
+
+.questionnaire-ta-note {
+    font-size: 0.85rem;
+    color: var(--accent-color, #3b82f6);
+    font-weight: 600;
+    margin: 0;
+}
+
+.questionnaire-select-input {
+    width: 100%;
+    padding: 10px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: var(--panel-bg);
+    color: var(--text-primary);
+    font-family: var(--font-primary);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color 0.15s ease;
+}
+
+.questionnaire-select-input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}

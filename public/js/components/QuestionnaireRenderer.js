@@ -186,7 +186,11 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
 
         // State map: key -> { QuestionId, AnswerType, AnswerText, InstructorId, TAId }
         const answersMap = new Map();
-        const getAnswerKey = (q) => `${q.questionId}_${q.instructorId ?? 'null'}_${q.taId ?? 'null'}`;
+        let selectedTaId = null;
+        let taSelectorCardEl = null;
+        let requiresTaSelection = false;
+
+        const getAnswerKey = (q) => `${q.questionId}_${q.instructorId ?? 'null'}`;
 
         const setAnswer = (q, answerText) => {
             const key = getAnswerKey(q);
@@ -199,7 +203,7 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                 AnswerType: Number(q.answerType),
                 AnswerText: String(answerText),
                 InstructorId: q.instructorId ?? null,
-                TAId: q.taId ?? null
+                TAId: q.usesTaDropdown ? selectedTaId : (q.taId ?? null)
             });
         };
 
@@ -256,15 +260,15 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                 (q) => q.answerType === 2 || (q.inputType === 'radio' && q.options.length === 5 && q.options.every((o, i) => o.value === String(i + 1)))
             );
 
-            if (section.isEvaluationSection || ratingQuestions.length > 0) {
-                const ratingValues = ratingQuestions[0]?.options?.map((o) => ({ value: o.value, label: o.label })) || [
-                    { value: '1', label: '1' },
-                    { value: '2', label: '2' },
-                    { value: '3', label: '3' },
-                    { value: '4', label: '4' },
-                    { value: '5', label: '5' }
-                ];
+            const ratingValues = ratingQuestions[0]?.options?.map((o) => ({ value: o.value, label: o.label })) || [
+                { value: '1', label: '1' },
+                { value: '2', label: '2' },
+                { value: '3', label: '3' },
+                { value: '4', label: '4' },
+                { value: '5', label: '5' }
+            ];
 
+            if (section.isEvaluationSection || ratingQuestions.length > 0) {
                 const selectAllBar = document.createElement('div');
                 selectAllBar.className = 'questionnaire-select-all-bar';
                 selectAllBar.innerHTML = `
@@ -306,11 +310,108 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
             questionsListEl.className = 'questionnaire-questions-list';
             const updatersForSection = [];
 
+            // Render TA Select field if section requires selecting a Teaching Assistant
+            const taOptionsList = Array.isArray(section.taOptions) && section.taOptions.length > 0
+                ? section.taOptions
+                : (Array.isArray(formData.taOptions) ? formData.taOptions : []);
+
+            if (section.hasTaSelector && taOptionsList.length > 0) {
+                requiresTaSelection = true;
+                const taCard = document.createElement('div');
+                taCard.className = 'subject-card questionnaire-question-card questionnaire-ta-select-card';
+                taSelectorCardEl = taCard;
+
+                const taNoteHtml = section.taSelectorNote
+                    ? `<p class="questionnaire-ta-note">${section.taSelectorNote}</p>`
+                    : '';
+
+                taCard.innerHTML = `
+                    ${taNoteHtml}
+                    <div class="questionnaire-question-title">
+                        <span>${section.taSelectorLabel || 'اسم عضو الهيئة المعاونة'}</span>
+                        <span class="mandatory-star" title="حقل إجباري">*</span>
+                    </div>
+                    <div class="questionnaire-question-controls">
+                        <select class="questionnaire-select-input" id="${containerId}-ta-select">
+                            <option value="">اختر عضو الهيئة المعاونة...</option>
+                            ${taOptionsList.map((opt) => `<option value="${opt.value}">${opt.label}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+
+                const selectEl = taCard.querySelector('select');
+                selectEl.addEventListener('change', (e) => {
+                    const val = e.target.value;
+                    selectedTaId = val ? (isNaN(Number(val)) ? val : Number(val)) : null;
+                    taCard.classList.remove('questionnaire-question-missing');
+
+                    // Sync TAId on any already-selected answers for TA questions
+                    section.questions.forEach((q) => {
+                        if (q.usesTaDropdown) {
+                            const key = getAnswerKey(q);
+                            const existing = answersMap.get(key);
+                            if (existing) {
+                                existing.TAId = selectedTaId;
+                            }
+                        }
+                    });
+                });
+
+                questionsListEl.appendChild(taCard);
+            }
+
+            let lastInstructorKey = null;
+            const instructorUpdatersMap = new Map();
+
             section.questions.forEach((q) => {
+                const instKey = q.instructorName ? `${q.instructorId ?? ''}_${q.instructorName}` : null;
+                if (instKey && instKey !== lastInstructorKey) {
+                    lastInstructorKey = instKey;
+                    instructorUpdatersMap.set(instKey, []);
+
+                    const instBanner = document.createElement('div');
+                    instBanner.className = 'questionnaire-instructor-banner';
+                    instBanner.innerHTML = `
+                        <div class="instructor-banner-info">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                            <strong>${q.instructorName}</strong>
+                        </div>
+                        <div class="instructor-quick-rate">
+                            <span class="instructor-quick-label">تحديد الكل:</span>
+                            <div class="select-all-buttons instructor-rate-btns"></div>
+                        </div>
+                    `;
+
+                    const instBtnsWrap = instBanner.querySelector('.instructor-rate-btns');
+                    const instBtns = [];
+                    ratingValues.forEach((opt) => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'rating-pill-btn sm-pill-btn';
+                        btn.dataset.val = opt.value;
+                        btn.textContent = opt.label;
+                        btn.addEventListener('click', () => {
+                            instBtns.forEach((b) => b.classList.remove('active'));
+                            btn.classList.add('active');
+                            const list = instructorUpdatersMap.get(instKey) || [];
+                            list.forEach((fn) => fn(opt.value));
+                        });
+                        instBtns.push(btn);
+                        instBtnsWrap.appendChild(btn);
+                    });
+
+                    questionsListEl.appendChild(instBanner);
+                }
+
+                const qKey = getAnswerKey(q);
                 const qCard = document.createElement('div');
                 qCard.className = 'subject-card questionnaire-question-card';
                 qCard.dataset.questionId = q.questionId;
-                questionCardElements.set(q.questionId, qCard);
+                qCard.dataset.answerKey = qKey;
+                questionCardElements.set(qKey, qCard);
 
                 const qHeader = document.createElement('div');
                 qHeader.className = 'questionnaire-question-title';
@@ -388,7 +489,7 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                         ratingRow.appendChild(btn);
                     });
 
-                    updatersForSection.push((targetVal) => {
+                    const updateQuestionRating = (targetVal) => {
                         const matchingBtn = optionButtons.find((b) => b.dataset.val === String(targetVal));
                         if (matchingBtn) {
                             optionButtons.forEach((b) => b.classList.remove('active'));
@@ -396,7 +497,12 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                             setAnswer(q, String(targetVal));
                             qCard.classList.remove('questionnaire-question-missing');
                         }
-                    });
+                    };
+
+                    updatersForSection.push(updateQuestionRating);
+                    if (instKey && instructorUpdatersMap.has(instKey)) {
+                        instructorUpdatersMap.get(instKey).push(updateQuestionRating);
+                    }
 
                     controlsWrap.appendChild(ratingRow);
 
@@ -408,7 +514,6 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                     }
                 } else {
                     // Single-choice radio (e.g. المستوى in البيانات الاساسية)
-                    // Provide both a quick pill grid AND a select dropdown synced together for maximum ease of use
                     const selectWrap = document.createElement('div');
                     selectWrap.className = 'questionnaire-choice-container';
 
@@ -466,20 +571,28 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
         submitBtn.addEventListener('click', async () => {
             feedbackBox.classList.add('hidden');
 
-            // ValidateQuestionnaire logic: ensure all mandatoryQuestionIds exist in AnswersList
-            const answersList = Array.from(answersMap.values());
-            const answeredQuestionIds = new Set(answersList.map((a) => a.QuestionId));
+            // 1. Validate TA selection if section has a TA dropdown
+            if (requiresTaSelection && !selectedTaId) {
+                if (taSelectorCardEl) {
+                    taSelectorCardEl.classList.add('questionnaire-question-missing');
+                    taSelectorCardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+                feedbackBox.className = 'questionnaire-feedback-box status-error';
+                feedbackBox.textContent = 'برجاء اختيار اسم عضو الهيئة المعاونة من القائمة أولاً.';
+                feedbackBox.classList.remove('hidden');
+                return;
+            }
 
-            const mandatoryIds = Array.isArray(formData.mandatoryQuestionIds) && formData.mandatoryQuestionIds.length > 0
-                ? formData.mandatoryQuestionIds
-                : (formData.sections || []).flatMap((s) => s.questions.filter((q) => q.mandatory).map((q) => q.questionId));
+            // 2. Validate all mandatory questions (including per-instructor question instances)
+            const allMandatoryQuestions = (formData.sections || []).flatMap((s) => s.questions.filter((q) => q.mandatory));
+            const missingQuestionKeys = allMandatoryQuestions
+                .map((q) => getAnswerKey(q))
+                .filter((key) => !answersMap.has(key));
 
-            const missingIds = mandatoryIds.filter((id) => !answeredQuestionIds.has(Number(id)));
-
-            if (missingIds.length > 0) {
+            if (missingQuestionKeys.length > 0) {
                 let firstMissingEl = null;
-                missingIds.forEach((id) => {
-                    const cardEl = questionCardElements.get(Number(id));
+                missingQuestionKeys.forEach((key) => {
+                    const cardEl = questionCardElements.get(key);
                     if (cardEl) {
                         cardEl.classList.add('questionnaire-question-missing');
                         if (!firstMissingEl) firstMissingEl = cardEl;
@@ -487,7 +600,7 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                 });
 
                 feedbackBox.className = 'questionnaire-feedback-box status-error';
-                feedbackBox.textContent = `برجاء الإجابة على جميع الأسئلة الإجبارية أولاً (متبقي ${missingIds.length} سؤال إجباري غير مجاب).`;
+                feedbackBox.textContent = `برجاء الإجابة على جميع الأسئلة الإجبارية أولاً (متبقي ${missingQuestionKeys.length} سؤال إجباري غير مجاب).`;
                 feedbackBox.classList.remove('hidden');
 
                 if (firstMissingEl) {
@@ -495,6 +608,8 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                 }
                 return;
             }
+
+            const answersList = Array.from(answersMap.values());
 
             submitBtn.disabled = true;
             submitBtn.innerHTML = `<div class="btn-loader"></div><span>جاري إرسال الاستبيان...</span>`;

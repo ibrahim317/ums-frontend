@@ -378,14 +378,38 @@ export class UmsParser {
 
         const parseAddToAnswersAttr = (onchangeStr) => {
             if (!onchangeStr) return null;
-            const m = onchangeStr.match(/AddToAnswers\(\s*(\d+)\s*,\s*(\d+)\s*,\s*this\.value\s*(?:,\s*([^,\s)]+))?\s*(?:,\s*([^,\s)]+))?\s*,?\s*\)/);
+            const m = onchangeStr.match(/AddToAnswers\(\s*(\d+)\s*,\s*(\d+)\s*,\s*this\.value\s*(?:,\s*([^,)]+))?\s*(?:,\s*(.+?))?\s*\)\s*;?\s*$/);
             if (!m) return null;
-            const parseNullable = (val) => (!val || val === 'null' || val === 'undefined') ? null : (isNaN(Number(val)) ? val : Number(val));
+            const parseNullable = (val) => {
+                if (!val) return null;
+                const trimmed = val.trim().replace(/,\s*$/, '');
+                if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null;
+                return isNaN(Number(trimmed)) ? trimmed : Number(trimmed);
+            };
+            const rawInstructor = parseNullable(m[3]);
+            const rawTaExpr = (m[4] || '').trim().replace(/,\s*$/, '');
+            let taId = null;
+            let usesTaDropdown = false;
+
+            if (rawTaExpr) {
+                const condMatch = rawTaExpr.match(/(\d+)\s*>\s*0\s*\?/);
+                if (condMatch) {
+                    usesTaDropdown = parseInt(condMatch[1], 10) > 0;
+                    taId = null;
+                } else if (rawTaExpr.includes('#TA')) {
+                    usesTaDropdown = true;
+                    taId = null;
+                } else {
+                    taId = parseNullable(rawTaExpr);
+                }
+            }
+
             return {
                 questionId: Number(m[1]),
                 answerType: Number(m[2]),
-                instructorId: parseNullable(m[3]),
-                taId: parseNullable(m[4])
+                instructorId: typeof rawInstructor === 'number' ? rawInstructor : null,
+                taId: typeof taId === 'number' ? taId : null,
+                usesTaDropdown
             };
         };
 
@@ -408,6 +432,28 @@ export class UmsParser {
         const mandatoryMatch = scriptText.match(/mandatoryQuestionIds\s*=\s*\[([\d,\s]*)\]/);
         const advisorMatch = scriptText.match(/var\s+advisor\s*=\s*(\{[\s\S]*?\}|null)\s*;/);
         const advisorActiveMatch = scriptText.match(/var\s+AdvisorId\s*=\s*(\d+)\s*==\s*2/);
+        const taAssignMatch = scriptText.match(/GetCourseTa\s*\(\s*\)\s*\{[\s\S]*?AssignIds\s*:\s*JSON\.stringify\(\s*(\[[\d,\s]*\])\s*\)/);
+
+        let taAssignIds = [];
+        if (taAssignMatch && taAssignMatch[1]) {
+            try {
+                const parsedIds = JSON.parse(taAssignMatch[1]);
+                if (Array.isArray(parsedIds)) {
+                    taAssignIds = parsedIds.filter(n => typeof n === 'number' && !isNaN(n));
+                }
+            } catch (e) {}
+        }
+
+        const uniqueTaIds = Array.from(new Set(taAssignIds));
+        const domTaOptions = [];
+        doc.querySelectorAll('#TA_listbox li').forEach((liEl, idx) => {
+            const label = liEl.textContent.replace(/\s+/g, ' ').trim();
+            if (!label) return;
+            const val = liEl.getAttribute('data-value') || (uniqueTaIds[idx] != null ? String(uniqueTaIds[idx]) : '');
+            if (val) {
+                domTaOptions.push({ value: String(val), label });
+            }
+        });
 
         let academicAdvisorId = null;
         if (advisorMatch && advisorMatch[1] && advisorMatch[1] !== 'null') {
@@ -430,9 +476,49 @@ export class UmsParser {
             const sectionTitle = headerEl ? headerEl.textContent.replace(/\s+/g, ' ').trim() : `القسم ${sIdx + 1}`;
             const questions = [];
 
+            const taInputEl = cardEl.querySelector('input#TA, input[name="TA"]');
+            let hasTaSelector = Boolean(taInputEl && taAssignIds.length > 0);
+            let taSelectorLabel = 'اسم عضو الهيئة المعاونة';
+            let taSelectorNote = '';
+
+            if (taInputEl) {
+                const formGroup = taInputEl.closest('.form-group');
+                if (formGroup) {
+                    const ctrlLabelEl = formGroup.querySelector('.control-label, label');
+                    if (ctrlLabelEl) {
+                        const txt = ctrlLabelEl.textContent.replace(/\s+/g, ' ').trim();
+                        if (txt) taSelectorLabel = txt;
+                    }
+                    const prevEl = formGroup.previousElementSibling;
+                    if (prevEl && prevEl.tagName.toLowerCase() === 'p') {
+                        const pTxt = prevEl.textContent.replace(/\s+/g, ' ').trim();
+                        if (pTxt) taSelectorNote = pTxt;
+                    }
+                }
+            }
+
             cardEl.querySelectorAll('.question-label').forEach((qLabelEl) => {
                 const qText = qLabelEl.textContent.replace(/\s+/g, ' ').trim();
                 const hasMandatoryIcon = !!qLabelEl.querySelector('.mandatory_icon');
+
+                let instructorName = null;
+                let prevEl = qLabelEl.previousElementSibling;
+                while (prevEl) {
+                    if (
+                        prevEl.tagName.toLowerCase() === 'label' &&
+                        !prevEl.classList.contains('question-label') &&
+                        !prevEl.classList.contains('section-header') &&
+                        !prevEl.classList.contains('answer-label') &&
+                        !prevEl.classList.contains('control-label')
+                    ) {
+                        const candidate = prevEl.textContent.replace(/\s+/g, ' ').trim();
+                        if (candidate) {
+                            instructorName = candidate;
+                            break;
+                        }
+                    }
+                    prevEl = prevEl.previousElementSibling;
+                }
 
                 let questionMeta = null;
                 let inputType = 'radio';
@@ -440,7 +526,14 @@ export class UmsParser {
                 let note = '';
 
                 let sib = qLabelEl.nextElementSibling;
-                while (sib && !sib.classList.contains('question-label') && !sib.classList.contains('section-header')) {
+                while (
+                    sib &&
+                    !sib.classList.contains('question-label') &&
+                    !sib.classList.contains('section-header') &&
+                    sib.tagName.toLowerCase() !== 'hr' &&
+                    sib.tagName.toLowerCase() !== 'label' &&
+                    !sib.classList.contains('form-group')
+                ) {
                     const formChecks = sib.classList.contains('form-check')
                         ? [sib]
                         : Array.from(sib.querySelectorAll('.form-check'));
@@ -478,9 +571,13 @@ export class UmsParser {
                 }
 
                 if (questionMeta) {
+                    if (questionMeta.usesTaDropdown && taAssignIds.length > 0) {
+                        hasTaSelector = true;
+                    }
                     const isMandatory = hasMandatoryIcon || mandatorySet.has(questionMeta.questionId);
                     questions.push({
                         ...questionMeta,
+                        instructorName,
                         text: qText,
                         mandatory: isMandatory,
                         inputType,
@@ -495,6 +592,10 @@ export class UmsParser {
                 sections.push({
                     title: sectionTitle,
                     isEvaluationSection,
+                    hasTaSelector,
+                    taSelectorLabel: hasTaSelector ? taSelectorLabel : null,
+                    taSelectorNote: hasTaSelector ? taSelectorNote : null,
+                    taOptions: hasTaSelector ? domTaOptions : [],
                     questions
                 });
             }
@@ -507,6 +608,8 @@ export class UmsParser {
             academicAdvisorId,
             requestVerificationToken,
             mandatoryQuestionIds,
+            taAssignIds,
+            taOptions: domTaOptions,
             sections
         };
     }
