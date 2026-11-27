@@ -107,6 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 7. Render saved credentials list
     savedAccountsController.render();
 
-    // 8. Boot page check auth status
+    // 8. Boot page check auth status & check for app updates
     authController.checkAuthStatus();
+    updaterService.checkUpdates(false);
 });

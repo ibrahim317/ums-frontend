@@ -7,7 +7,26 @@ import { appState } from './AppState.js';
 export class UpdaterService {
     constructor() {
         this.fetchedVersion = null;
+        this.isChecking = false;
+        this.isDownloading = false;
+        try {
+            localStorage.removeItem('dismissed_update_version');
+        } catch (e) {
+            // Ignore storage errors
+        }
         this.initProgressListeners();
+        this.initLifecycleListeners();
+    }
+
+    /**
+     * Re-checks for updates whenever the app is reopened / brought back to the foreground.
+     */
+    initLifecycleListeners() {
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                this.checkUpdates(false);
+            }
+        });
     }
 
     /**
@@ -78,7 +97,7 @@ export class UpdaterService {
         const downloadBtn = document.getElementById('update-download-btn');
         const closeBtn = document.getElementById('update-close-btn');
 
-        if (!updateModal) return;
+        if (!updateModal || this.isDownloading) return;
 
         updateMsg.textContent = `يتوفر إصدار جديد من التطبيق (${version}). هل تريد تحميل التحديث الآن؟`;
 
@@ -104,6 +123,7 @@ export class UpdaterService {
                 if (progressContainer) progressContainer.classList.remove('hidden');
                 updateMsg.textContent = 'جاري تحميل ملف التحديث الجديد. ستظهر لك شاشة التثبيت فور اكتماله.';
 
+                this.isDownloading = true;
                 try {
                     await window.Capacitor.Plugins.AppUpdater.downloadAndInstallApk({ url: downloadUrl });
                     updateModal.classList.add('hidden');
@@ -113,6 +133,8 @@ export class UpdaterService {
                     window.open(downloadUrl, '_blank');
                     updateModal.classList.add('hidden');
                     if (progressContainer) progressContainer.classList.add('hidden');
+                } finally {
+                    this.isDownloading = false;
                 }
             } else {
                 window.open(downloadUrl, '_blank');
@@ -121,7 +143,6 @@ export class UpdaterService {
         };
 
         closeBtn.onclick = () => {
-            localStorage.setItem('dismissed_update_version', version);
             updateModal.classList.add('hidden');
         };
 
@@ -132,6 +153,9 @@ export class UpdaterService {
      * Checks the GitHub API for latest releases and starts update UI check.
      */
     async checkUpdates(isManual = false) {
+        if (this.isChecking || this.isDownloading) return;
+        this.isChecking = true;
+
         const updateStatusLi = document.getElementById('update-status-li');
         const updateStatusText = document.getElementById('update-status-text');
         const downloadUpdateBtn = document.getElementById('download-update-btn');
@@ -185,6 +209,7 @@ export class UpdaterService {
                                 downloadUpdateBtn.disabled = true;
                                 if (progressContainer) progressContainer.classList.remove('hidden');
                                 updateStatusText.textContent = 'جاري تحميل ملف التحديث في الخلفية. ستظهر لك شاشة التثبيت فور الاكتمال.';
+                                this.isDownloading = true;
                                 try {
                                     await window.Capacitor.Plugins.AppUpdater.downloadAndInstallApk({ url: downloadUrl });
                                     downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
@@ -198,6 +223,8 @@ export class UpdaterService {
                                     downloadUpdateBtn.disabled = false;
                                     updateStatusText.textContent = 'فشل التحميل التلقائي. تم فتح رابط التحميل في المتصفح.';
                                     if (progressContainer) progressContainer.classList.add('hidden');
+                                } finally {
+                                    this.isDownloading = false;
                                 }
                             } else {
                                 window.open(downloadUrl, '_blank');
@@ -205,10 +232,9 @@ export class UpdaterService {
                         };
                     }
 
-                    const dismissed = localStorage.getItem('dismissed_update_version');
-                    if (!isManual && dismissed !== latestVersion) {
-                        this.showUpdateModal(latestVersion, downloadUrl);
-                    } else if (isManual) {
+                    const updateModal = document.getElementById('update-modal');
+                    const isModalAlreadyOpen = updateModal && !updateModal.classList.contains('hidden');
+                    if (isManual || !isModalAlreadyOpen) {
                         this.showUpdateModal(latestVersion, downloadUrl);
                     }
                 } else {
@@ -233,6 +259,7 @@ export class UpdaterService {
                 if (downloadUpdateBtn) downloadUpdateBtn.classList.add('hidden');
             }
         } finally {
+            this.isChecking = false;
             if (checkUpdateBtn) {
                 checkUpdateBtn.textContent = 'التحقق من التحديثات';
                 checkUpdateBtn.disabled = false;

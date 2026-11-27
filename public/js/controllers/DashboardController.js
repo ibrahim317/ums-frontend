@@ -287,7 +287,6 @@ export class DashboardController {
         if (!task1Failed) {
             this.backgroundPrefetchRemainingYears();
         }
-        this.updaterService.checkUpdates(false);
     }
 
     /**

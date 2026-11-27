@@ -186,26 +186,37 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
 
         // State map: key -> { QuestionId, AnswerType, AnswerText, InstructorId, TAId }
         const answersMap = new Map();
+        const sectionSelectedTaId = new Map();
         let selectedTaId = null;
-        let taSelectorCardEl = null;
-        let requiresTaSelection = false;
+        let isSubmitting = false;
+        let wasReady = false;
+        let activeHighlightEl = null;
+        let highlightTimeout = null;
+
+        // All required items in strict top-to-bottom DOM order
+        const orderedRequirements = [];
 
         const getAnswerKey = (q) => `${q.questionId}_${q.instructorId ?? 'null'}`;
 
-        const setAnswer = (q, answerText) => {
+        const setAnswer = (q, answerText, sectionIdx = null) => {
             const key = getAnswerKey(q);
             if (answerText === null || answerText === undefined || (q.inputType === 'textarea' && String(answerText).trim() === '' && !q.mandatory)) {
                 answersMap.delete(key);
                 return;
             }
+            const resolvedTaId = sectionIdx !== null && sectionSelectedTaId.has(sectionIdx)
+                ? sectionSelectedTaId.get(sectionIdx)
+                : selectedTaId;
             answersMap.set(key, {
                 QuestionId: Number(q.questionId),
                 AnswerType: Number(q.answerType),
                 AnswerText: String(answerText),
                 InstructorId: q.instructorId ?? null,
-                TAId: q.usesTaDropdown ? selectedTaId : (q.taId ?? null)
+                TAId: q.usesTaDropdown ? resolvedTaId : (q.taId ?? null)
             });
         };
+
+        let updateSubmitButtonState = () => {};
 
         const wrapper = document.createElement('div');
         wrapper.className = 'questionnaire-form-wrapper';
@@ -268,9 +279,12 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                 { value: '5', label: '5' }
             ];
 
+            let selectAllBarEl = null;
+
             if (section.isEvaluationSection || ratingQuestions.length > 0) {
                 const selectAllBar = document.createElement('div');
                 selectAllBar.className = 'questionnaire-select-all-bar';
+                selectAllBarEl = selectAllBar;
                 selectAllBar.innerHTML = `
                     <div class="select-all-label">
                         <strong>تحديد الكل بنقرة واحدة (${section.title}):</strong>
@@ -295,6 +309,7 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
 
                         const updaters = sectionElementUpdaters.get(sIdx) || [];
                         updaters.forEach((updateFn) => updateFn(opt.value));
+                        updateSubmitButtonState();
                     });
 
                     bulkBtns.push(btn);
@@ -309,6 +324,13 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
             const questionsListEl = document.createElement('div');
             questionsListEl.className = 'questionnaire-questions-list';
             const updatersForSection = [];
+            const ratingGroup = {
+                sectionIdx: sIdx,
+                title: section.title,
+                selectAllBarEl,
+                instructorBanners: new Map(),
+                mandatoryRatingQuestions: []
+            };
 
             // Render TA Select field if section requires selecting a Teaching Assistant
             const taOptionsList = Array.isArray(section.taOptions) && section.taOptions.length > 0
@@ -316,10 +338,8 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                 : (Array.isArray(formData.taOptions) ? formData.taOptions : []);
 
             if (section.hasTaSelector && taOptionsList.length > 0) {
-                requiresTaSelection = true;
                 const taCard = document.createElement('div');
                 taCard.className = 'subject-card questionnaire-question-card questionnaire-ta-select-card';
-                taSelectorCardEl = taCard;
 
                 const taNoteHtml = section.taSelectorNote
                     ? `<p class="questionnaire-ta-note">${section.taSelectorNote}</p>`
@@ -332,7 +352,7 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                         <span class="mandatory-star" title="حقل إجباري">*</span>
                     </div>
                     <div class="questionnaire-question-controls">
-                        <select class="questionnaire-select-input" id="${containerId}-ta-select">
+                        <select class="questionnaire-select-input" id="${containerId}-ta-select-${sIdx}">
                             <option value="">اختر عضو الهيئة المعاونة...</option>
                             ${taOptionsList.map((opt) => `<option value="${opt.value}">${opt.label}</option>`).join('')}
                         </select>
@@ -342,8 +362,12 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                 const selectEl = taCard.querySelector('select');
                 selectEl.addEventListener('change', (e) => {
                     const val = e.target.value;
-                    selectedTaId = val ? (isNaN(Number(val)) ? val : Number(val)) : null;
-                    taCard.classList.remove('questionnaire-question-missing');
+                    const parsedVal = val ? (isNaN(Number(val)) ? val : Number(val)) : null;
+                    selectedTaId = parsedVal;
+                    sectionSelectedTaId.set(sIdx, parsedVal);
+                    if (parsedVal) {
+                        taCard.classList.remove('questionnaire-question-missing');
+                    }
 
                     // Sync TAId on any already-selected answers for TA questions
                     section.questions.forEach((q) => {
@@ -351,10 +375,19 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                             const key = getAnswerKey(q);
                             const existing = answersMap.get(key);
                             if (existing) {
-                                existing.TAId = selectedTaId;
+                                existing.TAId = parsedVal;
                             }
                         }
                     });
+                    updateSubmitButtonState();
+                });
+
+                orderedRequirements.push({
+                    type: 'ta',
+                    label: section.taSelectorLabel || 'اسم عضو الهيئة المعاونة',
+                    cardEl: taCard,
+                    focusEl: selectEl,
+                    isFilled: () => Boolean(sectionSelectedTaId.get(sIdx))
                 });
 
                 questionsListEl.appendChild(taCard);
@@ -398,9 +431,15 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                             btn.classList.add('active');
                             const list = instructorUpdatersMap.get(instKey) || [];
                             list.forEach((fn) => fn(opt.value));
+                            updateSubmitButtonState();
                         });
                         instBtns.push(btn);
                         instBtnsWrap.appendChild(btn);
+                    });
+
+                    ratingGroup.instructorBanners.set(instKey, {
+                        bannerEl: instBanner,
+                        instructorName: q.instructorName
                     });
 
                     questionsListEl.appendChild(instBanner);
@@ -425,15 +464,23 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                 controlsWrap.className = 'questionnaire-question-controls';
 
                 const isRatingQuestion = q.answerType === 2 || (q.inputType === 'radio' && q.options.length === 5 && q.options.every((o, i) => o.value === String(i + 1)));
+                let focusControlEl = null;
 
                 if (q.inputType === 'textarea') {
                     const textarea = document.createElement('textarea');
                     textarea.className = 'questionnaire-textarea';
                     textarea.rows = 3;
                     textarea.placeholder = 'اكتب آراءك أو ملاحظاتك هنا...';
+                    focusControlEl = textarea;
                     textarea.addEventListener('input', (e) => {
-                        setAnswer(q, e.target.value);
-                        qCard.classList.remove('questionnaire-question-missing');
+                        const val = e.target.value;
+                        if (q.mandatory && val.trim() === '') {
+                            setAnswer(q, null, sIdx);
+                        } else {
+                            setAnswer(q, val, sIdx);
+                            qCard.classList.remove('questionnaire-question-missing');
+                        }
+                        updateSubmitButtonState();
                     });
                     controlsWrap.appendChild(textarea);
                 } else if (q.inputType === 'checkbox') {
@@ -455,12 +502,13 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                                 btn.classList.add('active');
                             }
                             if (selectedSet.size === 0) {
-                                setAnswer(q, null);
+                                setAnswer(q, null, sIdx);
                             } else {
                                 const joined = Array.from(selectedSet).map((v) => `${v};`).join('');
-                                setAnswer(q, joined);
+                                setAnswer(q, joined, sIdx);
                                 qCard.classList.remove('questionnaire-question-missing');
                             }
+                            updateSubmitButtonState();
                         });
                         pillsWrap.appendChild(btn);
                     });
@@ -481,8 +529,9 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                         btn.addEventListener('click', () => {
                             optionButtons.forEach((b) => b.classList.remove('active'));
                             btn.classList.add('active');
-                            setAnswer(q, opt.value);
+                            setAnswer(q, opt.value, sIdx);
                             qCard.classList.remove('questionnaire-question-missing');
+                            updateSubmitButtonState();
                         });
 
                         optionButtons.push(btn);
@@ -494,7 +543,7 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                         if (matchingBtn) {
                             optionButtons.forEach((b) => b.classList.remove('active'));
                             matchingBtn.classList.add('active');
-                            setAnswer(q, String(targetVal));
+                            setAnswer(q, String(targetVal), sIdx);
                             qCard.classList.remove('questionnaire-question-missing');
                         }
                     };
@@ -531,8 +580,9 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                         btn.addEventListener('click', () => {
                             choiceBtns.forEach((b) => b.classList.remove('active'));
                             btn.classList.add('active');
-                            setAnswer(q, opt.value);
+                            setAnswer(q, opt.value, sIdx);
                             qCard.classList.remove('questionnaire-question-missing');
+                            updateSubmitButtonState();
                         });
 
                         choiceBtns.push(btn);
@@ -541,6 +591,32 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
 
                     selectWrap.appendChild(pillsGrid);
                     controlsWrap.appendChild(selectWrap);
+                }
+
+                if (q.mandatory) {
+                    if (isRatingQuestion) {
+                        const ratingItem = {
+                            type: 'rating',
+                            label: q.text,
+                            key: qKey,
+                            q,
+                            cardEl: qCard,
+                            instKey,
+                            ratingGroup,
+                            isFilled: () => answersMap.has(qKey)
+                        };
+                        ratingGroup.mandatoryRatingQuestions.push(ratingItem);
+                        orderedRequirements.push(ratingItem);
+                    } else {
+                        orderedRequirements.push({
+                            type: 'question',
+                            label: q.text,
+                            key: qKey,
+                            cardEl: qCard,
+                            focusEl: focusControlEl,
+                            isFilled: () => answersMap.has(qKey)
+                        });
+                    }
                 }
 
                 qCard.appendChild(controlsWrap);
@@ -557,62 +633,182 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
         feedbackBox.className = 'questionnaire-feedback-box hidden';
         wrapper.appendChild(feedbackBox);
 
-        // Submit Footer
+        // Floating Sticky Submit Footer (always visible at bottom)
         const footerCard = document.createElement('div');
-        footerCard.className = 'subject-card questionnaire-submit-footer';
+        footerCard.className = 'questionnaire-submit-footer questionnaire-floating-footer';
         footerCard.innerHTML = `
-            <button type="button" class="primary-btn" id="${containerId}-submit-q-btn" style="max-width: 320px;">
-                <span>إرسال الاستبيان (Submit)</span>
-            </button>
+            <div class="questionnaire-floating-inner">
+                <div class="questionnaire-floating-status" id="${containerId}-submit-status"></div>
+                <button type="button" class="primary-btn questionnaire-floating-submit-btn is-disabled" id="${containerId}-submit-q-btn" aria-disabled="true">
+                    <span>إرسال الاستبيان (Submit)</span>
+                </button>
+            </div>
         `;
         wrapper.appendChild(footerCard);
 
         const submitBtn = footerCard.querySelector(`#${containerId}-submit-q-btn`);
-        submitBtn.addEventListener('click', async () => {
-            feedbackBox.classList.add('hidden');
+        const submitStatusEl = footerCard.querySelector(`#${containerId}-submit-status`);
 
-            // 1. Validate TA selection if section has a TA dropdown
-            if (requiresTaSelection && !selectedTaId) {
-                if (taSelectorCardEl) {
-                    taSelectorCardEl.classList.add('questionnaire-question-missing');
-                    taSelectorCardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const getValidationState = () => {
+            const missingItems = orderedRequirements.filter((item) => !item.isFilled());
+            const totalMissingCount = missingItems.length;
+
+            let nextTarget = null;
+            if (totalMissingCount > 0) {
+                const first = missingItems[0];
+
+                if (first.type === 'rating') {
+                    const group = first.ratingGroup;
+                    const answeredInGroup = group.mandatoryRatingQuestions.filter((item) => item.isFilled()).length;
+                    const instInfo = first.instKey ? group.instructorBanners.get(first.instKey) : null;
+
+                    // If some ratings in this section are already answered and there is a per-instructor
+                    // select-all banner for this missing question, jump to that instructor's banner so we
+                    // don't overwrite other instructors' ratings; otherwise jump to the section select-all bar.
+                    if (answeredInGroup > 0 && instInfo && instInfo.bannerEl) {
+                        nextTarget = {
+                            el: instInfo.bannerEl,
+                            focusEl: null,
+                            markCardEl: null,
+                            hint: `اختر تقييم "${instInfo.instructorName}" من تحديد الكل`
+                        };
+                    } else if (group.selectAllBarEl) {
+                        nextTarget = {
+                            el: group.selectAllBarEl,
+                            focusEl: null,
+                            markCardEl: null,
+                            hint: `اختر تقييم "${group.title}" من تحديد الكل بنقرة واحدة`
+                        };
+                    } else {
+                        nextTarget = {
+                            el: first.cardEl,
+                            focusEl: null,
+                            markCardEl: first.cardEl,
+                            hint: `مطلوب: ${first.label}`
+                        };
+                    }
+                } else {
+                    nextTarget = {
+                        el: first.cardEl,
+                        focusEl: first.focusEl || null,
+                        markCardEl: first.cardEl,
+                        hint: `مطلوب: ${first.label}`
+                    };
                 }
-                feedbackBox.className = 'questionnaire-feedback-box status-error';
-                feedbackBox.textContent = 'برجاء اختيار اسم عضو الهيئة المعاونة من القائمة أولاً.';
-                feedbackBox.classList.remove('hidden');
-                return;
             }
 
-            // 2. Validate all mandatory questions (including per-instructor question instances)
-            const allMandatoryQuestions = (formData.sections || []).flatMap((s) => s.questions.filter((q) => q.mandatory));
-            const missingQuestionKeys = allMandatoryQuestions
-                .map((q) => getAnswerKey(q))
-                .filter((key) => !answersMap.has(key));
+            return {
+                isReady: totalMissingCount === 0,
+                totalMissingCount,
+                missingItems,
+                nextTarget
+            };
+        };
 
-            if (missingQuestionKeys.length > 0) {
-                let firstMissingEl = null;
-                missingQuestionKeys.forEach((key) => {
-                    const cardEl = questionCardElements.get(key);
-                    if (cardEl) {
-                        cardEl.classList.add('questionnaire-question-missing');
-                        if (!firstMissingEl) firstMissingEl = cardEl;
+        const highlightAndScrollTo = (el, focusEl = null) => {
+            if (!el) return;
+            if (activeHighlightEl) {
+                activeHighlightEl.classList.remove('questionnaire-scroll-highlight');
+            }
+            if (highlightTimeout) {
+                clearTimeout(highlightTimeout);
+            }
+
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Restart animation if clicking the same target repeatedly
+            void el.offsetWidth;
+            el.classList.add('questionnaire-scroll-highlight');
+            activeHighlightEl = el;
+
+            if (focusEl && typeof focusEl.focus === 'function') {
+                setTimeout(() => {
+                    try {
+                        focusEl.focus({ preventScroll: true });
+                    } catch (e) {
+                        // Ignore focus errors
                     }
-                });
+                }, 350);
+            }
 
-                feedbackBox.className = 'questionnaire-feedback-box status-error';
-                feedbackBox.textContent = `برجاء الإجابة على جميع الأسئلة الإجبارية أولاً (متبقي ${missingQuestionKeys.length} سؤال إجباري غير مجاب).`;
-                feedbackBox.classList.remove('hidden');
+            highlightTimeout = setTimeout(() => {
+                if (activeHighlightEl) {
+                    activeHighlightEl.classList.remove('questionnaire-scroll-highlight');
+                    activeHighlightEl = null;
+                }
+            }, 2200);
+        };
 
-                if (firstMissingEl) {
-                    firstMissingEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        updateSubmitButtonState = (customHint = null) => {
+            if (isSubmitting) return;
+            const state = getValidationState();
+
+            if (state.isReady) {
+                submitBtn.classList.remove('is-disabled');
+                submitBtn.classList.add('is-ready');
+                submitBtn.setAttribute('aria-disabled', 'false');
+                submitBtn.innerHTML = `
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>إرسال الاستبيان (Submit)</span>
+                `;
+                if (submitStatusEl) {
+                    submitStatusEl.className = 'questionnaire-floating-status status-ready';
+                    submitStatusEl.textContent = 'جميع المطلوب مكتمل — جاهز للإرسال';
+                }
+                if (!wasReady) {
+                    feedbackBox.classList.add('hidden');
+                    submitBtn.classList.remove('just-enabled');
+                    void submitBtn.offsetWidth;
+                    submitBtn.classList.add('just-enabled');
+                }
+            } else {
+                submitBtn.classList.add('is-disabled');
+                submitBtn.classList.remove('is-ready', 'just-enabled');
+                submitBtn.setAttribute('aria-disabled', 'true');
+                submitBtn.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>إرسال الاستبيان (متبقي ${state.totalMissingCount})</span>
+                `;
+                if (submitStatusEl) {
+                    submitStatusEl.className = 'questionnaire-floating-status status-pending';
+                    submitStatusEl.textContent = customHint || 'اضغط على الزر للانتقال إلى الحقل المطلوب التالي';
+                }
+            }
+
+            wasReady = state.isReady;
+        };
+
+        submitBtn.addEventListener('click', async () => {
+            if (isSubmitting) return;
+            feedbackBox.classList.add('hidden');
+
+            const state = getValidationState();
+            if (!state.isReady) {
+                if (state.nextTarget) {
+                    if (state.nextTarget.markCardEl) {
+                        state.nextTarget.markCardEl.classList.add('questionnaire-question-missing');
+                    }
+                    highlightAndScrollTo(state.nextTarget.el, state.nextTarget.focusEl);
+                    updateSubmitButtonState(state.nextTarget.hint);
                 }
                 return;
             }
 
             const answersList = Array.from(answersMap.values());
 
+            isSubmitting = true;
             submitBtn.disabled = true;
+            submitBtn.classList.remove('is-ready', 'just-enabled');
             submitBtn.innerHTML = `<div class="btn-loader"></div><span>جاري إرسال الاستبيان...</span>`;
+            if (submitStatusEl) {
+                submitStatusEl.className = 'questionnaire-floating-status status-ready';
+                submitStatusEl.textContent = 'جاري حفظ وإرسال إجاباتك...';
+            }
 
             try {
                 const payload = {
@@ -644,14 +840,16 @@ export const renderQuestionnaireBlock = async (containerId, initialQuestionnaire
                     });
                 }
             } catch (err) {
+                isSubmitting = false;
                 submitBtn.disabled = false;
-                submitBtn.innerHTML = `<span>إرسال الاستبيان (Submit)</span>`;
+                updateSubmitButtonState();
                 feedbackBox.className = 'questionnaire-feedback-box status-error';
                 feedbackBox.textContent = err.message || 'حدث خطأ أثناء إرسال الاستبيان.';
                 feedbackBox.classList.remove('hidden');
             }
         });
 
+        updateSubmitButtonState();
         container.appendChild(wrapper);
         wrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
