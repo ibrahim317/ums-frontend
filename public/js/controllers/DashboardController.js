@@ -4,6 +4,7 @@ import { renderYearWorkGrades, renderSummerBreak } from '../components/YearWorkR
 import { renderGPA } from '../components/GPARenderer.js';
 import { renderPredictor } from '../components/PredictorRenderer.js';
 import { renderQuestionnaireBlock, renderPaymentBlock } from '../components/QuestionnaireRenderer.js';
+import { TextNormalizer } from '../utils/TextNormalizer.js';
 
 /**
  * DashboardController - Orchestrates academic year selections, tab views,
@@ -40,6 +41,7 @@ export class DashboardController {
 
         this.fetchedVersion = null;
         this.yearWorkSummerBreak = false;
+        this.yearWorkFetchPromises = new Map();
     }
 
     /**
@@ -115,12 +117,51 @@ export class DashboardController {
                 }
             });
         }
+
+        if (this.searchController && typeof this.searchController.setOnNeedYearWork === 'function') {
+            this.searchController.setOnNeedYearWork((yearLabels) => this.ensureYearWorkForYears(yearLabels));
+        }
+    }
+
+    /**
+     * Resolves a human-readable normalized academic year label (e.g. "2024-2025")
+     * for a given dropdown yearId (including '' for the default current year).
+     */
+    resolveYearLabel(yearId) {
+        if (Array.isArray(appState.cachedAcademicYears) && appState.cachedAcademicYears.length > 0) {
+            if (yearId) {
+                const exact = appState.cachedAcademicYears.find(y => String(y.Value) === String(yearId));
+                if (exact?.Text) return TextNormalizer.normalizeYearLabel(exact.Text);
+            } else {
+                const defaultEmpty = appState.cachedAcademicYears.find(y => y.Value === '' && y.Text && /20\d{2}/.test(y.Text));
+                if (defaultEmpty) return TextNormalizer.normalizeYearLabel(defaultEmpty.Text);
+
+                const selected = appState.cachedAcademicYears.find(y => y.Selected && y.Text);
+                if (selected) return TextNormalizer.normalizeYearLabel(selected.Text);
+
+                const firstWithYear = appState.cachedAcademicYears.find(y => y.Text && /20\d{2}/.test(y.Text));
+                if (firstWithYear) return TextNormalizer.normalizeYearLabel(firstWithYear.Text);
+            }
+        }
+
+        if (this.yearSelect && this.yearSelect.selectedIndex >= 0) {
+            const text = this.yearSelect.options[this.yearSelect.selectedIndex]?.text || '';
+            if (text && !/جاري التحميل|غير متاح|لا توجد/.test(text)) {
+                return TextNormalizer.normalizeYearLabel(text);
+            }
+        }
+
+        return '';
     }
 
     /**
      * Resets dashboard HTML elements and clears navigation cache display.
      */
     resetUI() {
+        this.yearWorkFetchPromises.clear();
+        if (appState.attemptedYearWorkYears) {
+            appState.attemptedYearWorkYears.clear();
+        }
         const gradesContainer = document.getElementById('grades-container');
         const gpaContainer = document.getElementById('gpa-container');
         if (gradesContainer) gradesContainer.innerHTML = '';
@@ -283,6 +324,16 @@ export class DashboardController {
         // Show the year-work tab (even if it has summer break banner)
         if (this.yearWorkTab) this.yearWorkTab.classList.remove('hidden');
 
+        // Re-index default current year's year-work now that academic years list has finished loading
+        const resolvedCurrentYear = this.resolveYearLabel('');
+        if (resolvedCurrentYear) {
+            appState.currentYearWorkLabel = resolvedCurrentYear;
+            if (Array.isArray(appState.currentYearWorkGrades?.terms) && appState.currentYearWorkGrades.terms.length > 0) {
+                this.searchService.addYearWorkData(resolvedCurrentYear, appState.currentYearWorkGrades);
+                appState.attemptedYearWorkYears.add(resolvedCurrentYear);
+            }
+        }
+
         this.checkAndUnlockSearch();
         if (!task1Failed) {
             this.backgroundPrefetchRemainingYears();
@@ -290,26 +341,100 @@ export class DashboardController {
     }
 
     /**
-     * Prefetches remaining historical academic years in the background silently for search indexing.
+     * Fetches and indexes a single academic year's year-work grades, deduplicating in-flight requests.
+     */
+    async _fetchAndIndexAcademicYear(year) {
+        if (!year || !year.Value) return;
+        const normYear = TextNormalizer.normalizeYearLabel(year.Text);
+
+        if (appState.cachedYearWorkData.has(year.Value)) {
+            const cached = appState.cachedYearWorkData.get(year.Value);
+            if (Array.isArray(cached?.data?.terms) && cached.data.terms.length > 0 && normYear) {
+                this.searchService.addYearWorkData(normYear, cached.data);
+            }
+            if (normYear) appState.attemptedYearWorkYears.add(normYear);
+            return;
+        }
+
+        if (this.yearWorkFetchPromises.has(year.Value)) {
+            return this.yearWorkFetchPromises.get(year.Value);
+        }
+
+        const promise = (async () => {
+            try {
+                const response = await fetchYearWorkGrades(year.Value, false);
+                const data = await response.json();
+                if (data.success) {
+                    const hasTerms = Array.isArray(data.data?.terms) && data.data.terms.length > 0;
+                    if (hasTerms) {
+                        appState.cachedYearWorkData.set(year.Value, { data: data.data, updatedAt: data.updatedAt });
+                        if (normYear) {
+                            this.searchService.addYearWorkData(normYear, data.data);
+                        }
+                    }
+                    if (normYear) {
+                        appState.attemptedYearWorkYears.add(normYear);
+                    }
+                    if (this.searchController) {
+                        this.searchController.refreshActiveDetailIfOpen();
+                    }
+                }
+            } catch (err) {
+                console.warn(`Year work prefetch failed for ${year.Text}:`, err);
+                if (normYear) {
+                    appState.attemptedYearWorkYears.add(normYear);
+                }
+            } finally {
+                this.yearWorkFetchPromises.delete(year.Value);
+            }
+        })();
+
+        this.yearWorkFetchPromises.set(year.Value, promise);
+        return promise;
+    }
+
+    /**
+     * Prefetches remaining historical academic years concurrently in the background for search indexing.
      */
     async backgroundPrefetchRemainingYears() {
         if (appState.cachedAcademicYears && Array.isArray(appState.cachedAcademicYears)) {
-            for (const year of appState.cachedAcademicYears) {
-                if (year.Value === '') continue; // Skip default current year which was loaded initially
-                if (appState.cachedYearWorkData.has(year.Value)) continue;
-                try {
-                    const response = await fetchYearWorkGrades(year.Value, false);
-                    const data = await response.json();
-                    if (data.success && Array.isArray(data.data?.terms) && data.data.terms.length > 0) {
-                        appState.cachedYearWorkData.set(year.Value, { data: data.data, updatedAt: data.updatedAt });
-                        this.searchService.addYearWorkData(year.Text, data.data);
-                    }
-                } catch (err) {
-                    console.warn(`Background year work prefetch failed for ${year.Text}:`, err);
-                }
+            const yearsToFetch = appState.cachedAcademicYears.filter(
+                (year) => year && year.Value !== '' && !appState.cachedYearWorkData.has(year.Value)
+            );
+
+            // Fetch in small parallel batches of 3 for fast indexing without overloading UMS
+            const batchSize = 3;
+            for (let i = 0; i < yearsToFetch.length; i += batchSize) {
+                const batch = yearsToFetch.slice(i, i + batchSize);
+                await Promise.allSettled(batch.map((year) => this._fetchAndIndexAcademicYear(year)));
             }
         }
         this.checkAndUnlockSearch();
+    }
+
+    /**
+     * Ensures year-work grades are fetched and indexed for specific normalized year labels
+     * (called on-demand when opening a subject from search before background prefetch completes).
+     */
+    async ensureYearWorkForYears(yearLabels = []) {
+        if (!Array.isArray(yearLabels) || yearLabels.length === 0) return;
+
+        if (!appState.cachedAcademicYears) {
+            await this.loadAcademicYears();
+        }
+
+        const targets = new Set(yearLabels.map((l) => TextNormalizer.normalizeYearLabel(l)).filter(Boolean));
+        if (targets.size === 0) return;
+
+        const matchingYears = (appState.cachedAcademicYears || []).filter((year) => {
+            const norm = TextNormalizer.normalizeYearLabel(year.Text);
+            return norm && targets.has(norm) && year.Value !== '';
+        });
+
+        await Promise.allSettled(matchingYears.map((year) => this._fetchAndIndexAcademicYear(year)));
+
+        // Mark any requested years that weren't present in the academic years list as attempted
+        targets.forEach((norm) => appState.attemptedYearWorkYears.add(norm));
     }
 
     /**
@@ -520,10 +645,11 @@ export class DashboardController {
                     appState.yearWorkCacheTime = data.updatedAt;
                 }
 
-                const ywYearLabel = this.yearSelect ? (this.yearSelect.options[this.yearSelect.selectedIndex]?.text || '') : '';
+                const ywYearLabel = this.resolveYearLabel('');
                 if (ywYearLabel) {
                     this.searchService.addYearWorkData(ywYearLabel, data.data);
                     appState.currentYearWorkLabel = ywYearLabel;
+                    appState.attemptedYearWorkYears.add(ywYearLabel);
                 }
 
                 if (activeTargetId === 'predictor-tab') {
@@ -670,15 +796,10 @@ export class DashboardController {
                     await this._applyBlockBannerIfNeeded('predictor-container', appState.currentYearWorkGrades, hasCachedTerms);
                 }
 
-                let ywYearLabel = '';
-                if (appState.cachedAcademicYears) {
-                    const opt = appState.cachedAcademicYears.find(y => y.Value === yearId);
-                    if (opt) ywYearLabel = opt.Text;
+                const ywYearLabel = this.resolveYearLabel(yearId);
+                if (ywYearLabel) {
+                    appState.currentYearWorkLabel = ywYearLabel;
                 }
-                if (!ywYearLabel && yearId === '' && this.yearSelect) {
-                    ywYearLabel = this.yearSelect.options[this.yearSelect.selectedIndex]?.text || '';
-                }
-                appState.currentYearWorkLabel = ywYearLabel;
             }
 
             if (activeTargetId === 'year-work-tab') {
@@ -734,18 +855,12 @@ export class DashboardController {
                     }
                 }
 
-                let ywYearLabel = '';
-                if (appState.cachedAcademicYears) {
-                    const opt = appState.cachedAcademicYears.find(y => y.Value === yearId);
-                    if (opt) ywYearLabel = opt.Text;
-                }
-                if (!ywYearLabel && yearId === '' && this.yearSelect) {
-                    ywYearLabel = this.yearSelect.options[this.yearSelect.selectedIndex]?.text || '';
-                }
+                const ywYearLabel = this.resolveYearLabel(yearId);
                 if (ywYearLabel) {
                     this.searchService.addYearWorkData(ywYearLabel, data.data);
+                    appState.attemptedYearWorkYears.add(ywYearLabel);
                 }
-                if (yearId === '') {
+                if (yearId === '' && ywYearLabel) {
                     appState.currentYearWorkLabel = ywYearLabel;
                 }
 
@@ -906,6 +1021,7 @@ export class DashboardController {
                     appState.gpaCacheTime = null;
                     appState.cachedAcademicYears = null;
                     appState.cachedYearWorkData.clear();
+                    this.yearWorkFetchPromises.clear();
 
                     if (this.searchController) {
                         this.searchController.clearSearch();

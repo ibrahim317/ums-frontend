@@ -10,8 +10,32 @@ export class SearchController {
     constructor(searchService, onUnlockRequested) {
         this.searchService = searchService;
         this.onUnlockRequested = onUnlockRequested;
+        this.onNeedYearWork = null;
         this.overlay = null;
         this.openedFromCard = false;
+        this.activeDetailNormalizedName = null;
+    }
+
+    /**
+     * Registers a callback used to fetch year-work grades on demand when opening a subject
+     * whose historical year-work data hasn't been loaded yet.
+     */
+    setOnNeedYearWork(callback) {
+        this.onNeedYearWork = callback;
+    }
+
+    /**
+     * Refreshes the currently open subject detail view if search overlay is visible.
+     */
+    refreshActiveDetailIfOpen() {
+        if (!this.overlay || this.overlay.classList.contains('hidden')) return;
+        const detail = document.getElementById('search-detail');
+        if (detail && !detail.classList.contains('hidden') && this.activeDetailNormalizedName) {
+            const updated = appState.searchIndex.find(i => i.normalizedName === this.activeDetailNormalizedName);
+            if (updated) {
+                this.showDetail(updated, { skipOnDemandFetch: true });
+            }
+        }
     }
 
     /**
@@ -145,6 +169,7 @@ export class SearchController {
     closeSearch() {
         if (!this.overlay) return;
         this.overlay.classList.add('hidden');
+        this.activeDetailNormalizedName = null;
         document.body.style.overflow = '';
     }
 
@@ -173,11 +198,15 @@ export class SearchController {
      * Clear search indexed entries.
      */
     clearSearch() {
+        this.activeDetailNormalizedName = null;
         this.searchService.setGPAData(null);
         appState.yearWorkEntries = [];
         appState.searchIndex = [];
         appState.currentYearWorkGrades = null;
         appState.currentYearWorkLabel = '';
+        if (appState.attemptedYearWorkYears) {
+            appState.attemptedYearWorkYears.clear();
+        }
     }
 
     /**
@@ -219,19 +248,42 @@ export class SearchController {
     /**
      * Renders the details drawer of occurrences, predictive grades, and final estimates.
      */
-    showDetail(item) {
+    showDetail(item, options = {}) {
+        const { skipOnDemandFetch = false } = options;
+
         if (typeof item === 'string') {
             const norm = TextNormalizer.normalizeArabic(item);
-            item = appState.searchIndex.find(i => i.normalizedName === norm);
+            const code = TextNormalizer.extractCourseCode(item);
+            item = appState.searchIndex.find(
+                i => i.normalizedName === norm || (code && Array.isArray(i.codes) && i.codes.includes(code))
+            );
             if (!item) return;
+        } else if (item?.normalizedName) {
+            // Always read the latest merged entry from searchIndex in case year-work arrived after rendering results
+            const latest = appState.searchIndex.find(i => i.normalizedName === item.normalizedName);
+            if (latest) item = latest;
         }
 
         const detail = document.getElementById('search-detail');
         const results = document.getElementById('search-results');
         if (!detail || !results) return;
 
+        this.activeDetailNormalizedName = item.normalizedName;
         results.classList.add('hidden');
         detail.classList.remove('hidden');
+
+        // Identify years in this subject that don't have year-work loaded yet and haven't been attempted
+        const missingYearLabels = [];
+        item.occurrences.forEach(occ => {
+            const normYear = TextNormalizer.normalizeYearLabel(occ.yearLabel);
+            if (!occ.yearWorkGrades?.length && normYear && !appState.attemptedYearWorkYears.has(normYear)) {
+                if (!missingYearLabels.includes(normYear)) {
+                    missingYearLabels.push(normYear);
+                }
+            }
+        });
+
+        const willFetchOnDemand = !skipOnDemandFetch && missingYearLabels.length > 0 && typeof this.onNeedYearWork === 'function';
 
         const byYear = new Map();
         item.occurrences.forEach(occ => {
@@ -242,6 +294,7 @@ export class SearchController {
         let html = `<h2 class="search-detail-title">${item.displayName}</h2>`;
 
         byYear.forEach((terms, yearLabel) => {
+            const normYear = TextNormalizer.normalizeYearLabel(yearLabel);
             html += `<div class="search-detail-year">
                 <div class="search-detail-year-label">${yearLabel}</div>`;
 
@@ -257,15 +310,29 @@ export class SearchController {
                         html += `<li><span class="grade-label">-</span><span class="grade-value">${g}</span></li>`;
                     });
                     html += `</ul></div>`;
+                } else if (willFetchOnDemand && missingYearLabels.includes(normYear)) {
+                    html += `<div class="search-detail-section">
+                        <div class="search-detail-section-label">أعمال السنة</div>
+                        <p style="font-size: 0.85rem; color: var(--text-secondary); padding: 6px 0;">جاري تحميل تفاصيل أعمال السنة...</p>
+                    </div>`;
+                } else if (occ.gpaInfo && appState.attemptedYearWorkYears.has(normYear)) {
+                    html += `<div class="search-detail-section">
+                        <div class="search-detail-section-label">أعمال السنة</div>
+                        <p style="font-size: 0.82rem; color: var(--text-secondary); padding: 4px 0;">لا تتوفر تفاصيل أعمال سنة لهذا الفصل في نظام UMS</p>
+                    </div>`;
                 }
 
                 // Predictions logic
                 let predictorSubject = null;
                 if (appState.currentYearWorkGrades && appState.currentYearWorkGrades.terms && appState.currentYearWorkGrades.terms.length > 0) {
                     const currentTerm = appState.currentYearWorkGrades.terms[appState.currentYearWorkGrades.terms.length - 1];
-                    const currentTermNorm = TextNormalizer.normalizeTermTitle(currentTerm.title);
+                    const currentTermKey = TextNormalizer.normalizeTermKey(currentTerm.title);
+                    const occTermKey = occ.termKey || TextNormalizer.normalizeTermKey(occ.termTitle);
 
-                    if (yearLabel === appState.currentYearWorkLabel && occ.termTitle === currentTermNorm) {
+                    if (
+                        normYear === TextNormalizer.normalizeYearLabel(appState.currentYearWorkLabel) &&
+                        occTermKey === currentTermKey
+                    ) {
                         const targetNormName = TextNormalizer.normalizeArabic(item.displayName);
                         predictorSubject = currentTerm.subjects.find(sub => TextNormalizer.normalizeArabic(sub.name) === targetNormName);
                     }
@@ -392,5 +459,25 @@ export class SearchController {
         });
 
         detail.innerHTML = html;
+
+        if (willFetchOnDemand) {
+            const targetNorm = item.normalizedName;
+            Promise.resolve(this.onNeedYearWork(missingYearLabels))
+                .then(() => {
+                    if (
+                        this.activeDetailNormalizedName === targetNorm &&
+                        this.overlay &&
+                        !this.overlay.classList.contains('hidden')
+                    ) {
+                        const refreshed = appState.searchIndex.find(i => i.normalizedName === targetNorm);
+                        if (refreshed) {
+                            this.showDetail(refreshed, { skipOnDemandFetch: true });
+                        }
+                    }
+                })
+                .catch((err) => {
+                    console.warn('On-demand year work fetch for search detail failed:', err);
+                });
+        }
     }
 }

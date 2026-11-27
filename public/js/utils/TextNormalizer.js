@@ -3,38 +3,137 @@
  */
 export class TextNormalizer {
     /**
-     * Cleans prefixes like "[Prefix]" or "المقرر: " from a subject name.
+     * Extracts a standardized course code (e.g. "CS305") from a subject name if present.
+     */
+    static extractCourseCode(name) {
+        if (!name) return null;
+        const bracketMatch = String(name).match(/\[\s*([A-Za-z]{2,6}\s*\d{2,4}[A-Za-z]?)\s*\]/);
+        if (bracketMatch) return bracketMatch[1].replace(/\s+/g, '').toUpperCase();
+
+        const leadMatch = String(name).match(/^(?:المقرر:|Course:)?\s*([A-Za-z]{2,6}\s*\d{2,4}[A-Za-z]?)\s*[-–—:]/i);
+        if (leadMatch) return leadMatch[1].replace(/\s+/g, '').toUpperCase();
+
+        const trailMatch = String(name).match(/(?:[-–—]|\()\s*([A-Za-z]{2,6}\s*\d{2,4}[A-Za-z]?)\s*\)?$/);
+        if (trailMatch) return trailMatch[1].replace(/\s+/g, '').toUpperCase();
+
+        return null;
+    }
+
+    /**
+     * Cleans prefixes/suffixes like "[CS305]", "CS305 - ", or "المقرر: " from a subject name.
      */
     static cleanSubjectName(name) {
         return (name || '')
             .replace(/^(المقرر:|Course:)\s*/i, '')
             .replace(/^\[[^\]]+\]\s*/, '')
-            .trim();
-    }
-
-    /**
-     * Normalizes Arabic text by removing diacritics and standardizing specific characters.
-     */
-    static normalizeArabic(text) {
-        return this.cleanSubjectName(text)
-            .replace(/[\u0610-\u061A\u064B-\u065F\u0670]/g, '')
-            .replace(/[أإآ]/g, 'ا')
-            .replace(/ة/g, 'ه')
-            .replace(/ى/g, 'ي')
+            .replace(/\s*\[[^\]]+\]$/, '')
+            .replace(/^[A-Za-z]{2,6}\s*\d{2,4}[A-Za-z]?\s*[-–—:]\s*/, '')
+            .replace(/\s*[-–—]\s*[A-Za-z]{2,6}\s*\d{2,4}[A-Za-z]?$/, '')
+            .replace(/\s*\([A-Za-z]{2,6}\s*\d{2,4}[A-Za-z]?\)$/, '')
             .replace(/\s+/g, ' ')
             .trim();
     }
 
     /**
-     * Standardizes term titles like "الخريف" or "الربيع".
+     * Normalizes Arabic & English text for case-insensitive, diacritic-insensitive matching.
+     */
+    static normalizeArabic(text) {
+        return this.cleanSubjectName(text)
+            .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+            .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u0640]/g, '')
+            .replace(/[أإآ]/g, 'ا')
+            .replace(/ة/g, 'ه')
+            .replace(/ى/g, 'ي')
+            .replace(/[-–—_]+/g, ' ')
+            .toLowerCase()
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    /**
+     * Normalizes academic year labels (e.g. "2024 - 2025", "العام الأكاديمي 2024/2025")
+     * into a canonical format like "2024-2025".
+     */
+    static normalizeYearLabel(yearLabel) {
+        if (!yearLabel) return '';
+        const latin = String(yearLabel).replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
+        const rangeMatch = latin.match(/(20\d{2})\s*[-/–—]\s*(20\d{2})/);
+        if (rangeMatch) {
+            return `${rangeMatch[1]}-${rangeMatch[2]}`;
+        }
+        const singleYear = latin.match(/(20\d{2})/);
+        if (singleYear) {
+            return singleYear[1];
+        }
+        return latin.replace(/\s+/g, ' ').trim();
+    }
+
+    /**
+     * Returns a canonical term key ('term_1', 'term_2', 'term_3') so Arabic/English
+     * and Fall/First or Spring/Second labels merge cleanly between GPA and Year Work.
+     */
+    static normalizeTermKey(title) {
+        if (!title) return '';
+        const t = String(title)
+            .replace(/\[.*?\]/g, '')
+            .replace(/[٠-٩]/g, d => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+            .replace(/[\u0610-\u061A\u064B-\u065F\u0670\u0640]/g, '')
+            .replace(/[أإآ]/g, 'ا')
+            .replace(/ة/g, 'ه')
+            .replace(/ى/g, 'ي')
+            .toLowerCase()
+            .trim();
+
+        if (
+            t.includes('خريف') ||
+            t.includes('الاول') ||
+            t.includes('اول') ||
+            t.includes('يناير') ||
+            t.includes('fall') ||
+            t.includes('autumn') ||
+            t.includes('first') ||
+            t.includes('january') ||
+            /\b(term|semester)\s*1\b/.test(t)
+        ) {
+            return 'term_1';
+        }
+        if (
+            t.includes('ربيع') ||
+            t.includes('الثاني') ||
+            t.includes('ثاني') ||
+            t.includes('مايو') ||
+            t.includes('يونيو') ||
+            t.includes('spring') ||
+            t.includes('second') ||
+            t.includes('may') ||
+            t.includes('june') ||
+            /\b(term|semester)\s*2\b/.test(t)
+        ) {
+            return 'term_2';
+        }
+        if (
+            t.includes('صيف') ||
+            t.includes('اغسطس') ||
+            t.includes('سبتمبر') ||
+            t.includes('summer') ||
+            t.includes('third') ||
+            t.includes('august') ||
+            /\b(term|semester)\s*3\b/.test(t)
+        ) {
+            return 'term_3';
+        }
+        return t.replace(/\s+/g, ' ');
+    }
+
+    /**
+     * Standardizes term titles for display while aligning Arabic & English variants.
      */
     static normalizeTermTitle(title) {
         if (!title) return '';
-        if (title.includes('الخريف')) return 'فصل الخريف';
-        if (title.includes('الربيع')) return 'فصل الربيع';
-        if (title.includes('الصيف')) return 'فصل الصيف';
-        if (title.includes('الأول') || title.includes('الاول')) return 'الفصل الدراسي الأول';
-        if (title.includes('الثاني') || title.includes('الثاني')) return 'الفصل الدراسي الثاني';
+        const key = this.normalizeTermKey(title);
+        if (key === 'term_1') return 'فصل الخريف';
+        if (key === 'term_2') return 'فصل الربيع';
+        if (key === 'term_3') return 'فصل الصيف';
         return title.replace(/\[.*\]/g, '').trim();
     }
 
