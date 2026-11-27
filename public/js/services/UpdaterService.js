@@ -46,6 +46,15 @@ export class UpdaterService {
     }
 
     /**
+     * Formats a byte count into megabytes (e.g. "4.25 MB").
+     */
+    formatSizeInMB(bytes) {
+        if (!bytes || typeof bytes !== 'number' || bytes <= 0) return '';
+        const mb = bytes / (1024 * 1024);
+        return `${mb.toFixed(2)} MB`;
+    }
+
+    /**
      * Listens to the Capacitor AppUpdater plugin download progress.
      */
     initProgressListeners() {
@@ -53,7 +62,7 @@ export class UpdaterService {
             try {
                 window.Capacitor.Plugins.AppUpdater.addListener('downloadProgress', (info) => {
                     const progress = info.progress || 0;
-                    this.updateProgressUI(progress);
+                    this.updateProgressUI(progress, info.bytesDownloaded, info.bytesTotal);
                 });
             } catch (e) {
                 console.error('Failed to register download progress listener:', e);
@@ -64,7 +73,11 @@ export class UpdaterService {
     /**
      * Updates download progress bar widths and texts.
      */
-    updateProgressUI(progress) {
+    updateProgressUI(progress, bytesDownloaded = null, bytesTotal = null) {
+        const progressLabel = bytesTotal > 0
+            ? `${(bytesDownloaded / (1024 * 1024)).toFixed(2)} / ${(bytesTotal / (1024 * 1024)).toFixed(2)} MB (${progress}%)`
+            : `${progress}%`;
+
         // Update modal progress elements
         const modalProgressContainer = document.getElementById('update-progress-container');
         const modalProgressText = document.getElementById('update-progress-text');
@@ -72,7 +85,7 @@ export class UpdaterService {
 
         if (modalProgressContainer && modalProgressText && modalProgressBar) {
             modalProgressContainer.classList.remove('hidden');
-            modalProgressText.textContent = `${progress}%`;
+            modalProgressText.textContent = progressLabel;
             modalProgressBar.style.width = `${progress}%`;
         }
 
@@ -83,7 +96,7 @@ export class UpdaterService {
 
         if (settingsProgressContainer && settingsProgressText && settingsProgressBar) {
             settingsProgressContainer.classList.remove('hidden');
-            settingsProgressText.textContent = `${progress}%`;
+            settingsProgressText.textContent = progressLabel;
             settingsProgressBar.style.width = `${progress}%`;
         }
     }
@@ -91,7 +104,7 @@ export class UpdaterService {
     /**
      * Displays a native update dialog overlay.
      */
-    showUpdateModal(version, downloadUrl) {
+    showUpdateModal(version, downloadUrl, sizeBytes = null) {
         const updateModal = document.getElementById('update-modal');
         const updateMsg = document.getElementById('update-modal-message');
         const downloadBtn = document.getElementById('update-download-btn');
@@ -99,9 +112,12 @@ export class UpdaterService {
 
         if (!updateModal || this.isDownloading) return;
 
-        updateMsg.textContent = `يتوفر إصدار جديد من التطبيق (${version}). هل تريد تحميل التحديث الآن؟`;
+        const sizeLabel = this.formatSizeInMB(sizeBytes);
+        updateMsg.textContent = sizeLabel
+            ? `يتوفر إصدار جديد من التطبيق (${version}) بحجم ${sizeLabel}. هل تريد تحميل التحديث الآن؟`
+            : `يتوفر إصدار جديد من التطبيق (${version}). هل تريد تحميل التحديث الآن؟`;
 
-        downloadBtn.textContent = 'تحميل';
+        downloadBtn.textContent = sizeLabel ? `تحميل (${sizeLabel})` : 'تحميل';
         downloadBtn.disabled = false;
         closeBtn.classList.remove('hidden');
 
@@ -185,13 +201,18 @@ export class UpdaterService {
 
                 if (apkAsset) {
                     const downloadUrl = apkAsset.browser_download_url;
+                    const sizeBytes = apkAsset.size || null;
+                    const sizeLabel = this.formatSizeInMB(sizeBytes);
+                    const downloadBtnLabel = sizeLabel ? `تحميل التحديث الآن (${sizeLabel})` : 'تحميل التحديث الآن';
 
                     if (updateStatusLi && updateStatusText && downloadUpdateBtn) {
                         updateStatusLi.classList.remove('hidden');
-                        updateStatusText.textContent = `يتوفر تحديث جديد: ${latestVersion}`;
+                        updateStatusText.textContent = sizeLabel
+                            ? `يتوفر تحديث جديد: ${latestVersion} (${sizeLabel})`
+                            : `يتوفر تحديث جديد: ${latestVersion}`;
                         downloadUpdateBtn.classList.remove('hidden');
 
-                        downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
+                        downloadUpdateBtn.textContent = downloadBtnLabel;
                         downloadUpdateBtn.disabled = false;
 
                         const progressContainer = document.getElementById('settings-update-progress-container');
@@ -212,14 +233,14 @@ export class UpdaterService {
                                 this.isDownloading = true;
                                 try {
                                     await window.Capacitor.Plugins.AppUpdater.downloadAndInstallApk({ url: downloadUrl });
-                                    downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
+                                    downloadUpdateBtn.textContent = downloadBtnLabel;
                                     downloadUpdateBtn.disabled = false;
                                     updateStatusText.textContent = `تم تحميل وتثبيت التحديث ${latestVersion}.`;
                                     if (progressContainer) progressContainer.classList.add('hidden');
                                 } catch (e) {
                                     console.error("Native update failed:", e);
                                     window.open(downloadUrl, '_blank');
-                                    downloadUpdateBtn.textContent = 'تحميل التحديث الآن';
+                                    downloadUpdateBtn.textContent = downloadBtnLabel;
                                     downloadUpdateBtn.disabled = false;
                                     updateStatusText.textContent = 'فشل التحميل التلقائي. تم فتح رابط التحميل في المتصفح.';
                                     if (progressContainer) progressContainer.classList.add('hidden');
@@ -235,7 +256,7 @@ export class UpdaterService {
                     const updateModal = document.getElementById('update-modal');
                     const isModalAlreadyOpen = updateModal && !updateModal.classList.contains('hidden');
                     if (isManual || !isModalAlreadyOpen) {
-                        this.showUpdateModal(latestVersion, downloadUrl);
+                        this.showUpdateModal(latestVersion, downloadUrl, sizeBytes);
                     }
                 } else {
                     if (isManual && updateStatusLi && updateStatusText) {

@@ -90,6 +90,8 @@ public class AppUpdaterPlugin extends Plugin {
                             double progress = (bytesDownloaded * 100.0) / bytesTotal;
                             JSObject ret = new JSObject();
                             ret.put("progress", (int) progress);
+                            ret.put("bytesDownloaded", bytesDownloaded);
+                            ret.put("bytesTotal", bytesTotal);
                             notifyListeners("downloadProgress", ret);
                         }
 
